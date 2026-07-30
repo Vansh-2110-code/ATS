@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+backend/.env
+backend/node_modules
+backend/uploads/*
+!backend/uploads/.gitkeep
+*.log
+*.zip
+.DS_Store
+.claude
+ats-main/
