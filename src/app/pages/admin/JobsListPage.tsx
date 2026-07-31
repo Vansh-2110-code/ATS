@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { dedupeCompanies } from '../../utils/companyUtils';
 
 const STATUS_COLORS: Record<string, string> = {
   Open: 'bg-emerald-100 text-emerald-700',
@@ -108,7 +109,8 @@ export function JobsListPage() {
   useEffect(() => { setPage(1); }, [search, statusFilter, companyQ]);
   useEffect(() => {
     api.getCompanyList().then((data: any) => {
-      setCompaniesList(Array.isArray(data) ? data : (data.companies || []));
+      const raw = Array.isArray(data) ? data : (data.companies || []);
+      setCompaniesList(dedupeCompanies(raw));
     }).catch(() => {});
   }, []);
 
@@ -430,8 +432,8 @@ export function JobsListPage() {
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500/30"
                   >
                     <option value="" disabled>Select Company</option>
-                    {companiesList.map((c: any) => (
-                      <option key={c._id || c.id} value={c.companyName}>{c.companyName}</option>
+                    {dedupeCompanies(companiesList).map((c: any) => (
+                      <option key={c._id || c.id || c.companyName} value={c.companyName}>{c.companyName}</option>
                     ))}
                   </select>
                 </div>

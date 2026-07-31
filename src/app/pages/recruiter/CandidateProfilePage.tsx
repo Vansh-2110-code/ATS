@@ -9,6 +9,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { calculateAge } from '../../utils/ageCalculator';
+import { dedupeCompanies } from '../../utils/companyUtils';
+import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS } from '../../utils/candidateStatusUtils';
 
 const API_BASE = window.location.origin;
 
@@ -21,38 +23,8 @@ const EMAIL_TEMPLATES = [
   { value: 'offer_letter',            label: 'Letter for Initial Job Offer' },
 ];
 
-const STATUS_OPTIONS = [
-  'New', 'Contacted', 'Interested', 'Selected for Call', 'Screening',
-  'Interview Scheduled', 'Selected', 'Rejected',
-  'Eligible Candidates', 'Wrong Number', 'Unreachable',
-  'Did Not Pick', 'Unanswered Calls', 'Call Back',
-  'HR Shortlist', 'Written Test', 'Operations Round',
-  'Document Pending', 'Documentation', 'Yet To Join', 'Joined', 'Exited',
-];
-const STATUS_COLORS: Record<string, string> = {
-  New: 'bg-slate-100 text-slate-600 border-slate-200',
-  Contacted: 'bg-green-100 text-green-700 border-green-200',
-  Interested: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  'Selected for Call': 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  Screening: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  'Interview Scheduled': 'bg-violet-100 text-violet-700 border-violet-200',
-  Selected: 'bg-teal-100 text-teal-700 border-teal-200',
-  Rejected: 'bg-red-100 text-red-600 border-red-200',
-  'Eligible Candidates': 'bg-green-100 text-green-700 border-green-200',
-  'Wrong Number': 'bg-orange-100 text-orange-700 border-orange-200',
-  Unreachable: 'bg-orange-100 text-orange-700 border-orange-200',
-  'Did Not Pick': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Unanswered Calls': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Call Back': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  'HR Shortlist': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  'Written Test': 'bg-blue-100 text-blue-700 border-blue-200',
-  'Operations Round': 'bg-sky-100 text-sky-700 border-sky-200',
-  'Document Pending': 'bg-rose-100 text-rose-700 border-rose-200',
-  Documentation: 'bg-rose-100 text-rose-700 border-rose-200',
-  'Yet To Join': 'bg-purple-100 text-purple-700 border-purple-200',
-  Joined: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  Exited: 'bg-red-100 text-red-700 border-red-200',
-};
+const STATUS_OPTIONS = [...CANDIDATE_STATUS_OPTIONS];
+const STATUS_COLORS: Record<string, string> = CANDIDATE_STATUS_COLORS;
 
 const OWNERSHIP_STATUS_COLORS: Record<string, string> = {
   'Assigned': 'bg-green-50 text-green-700 border-green-200',
@@ -286,7 +258,8 @@ export function CandidateProfilePage() {
     const shouldFetchUsers = (isAdmin && reassignOpen) || (isTLOrAdmin && tagOpen);
     if (shouldFetchUsers || showJoiningModal || isAdmin) {
       api.getCompanies().then(d => {
-        setCompanies(d.companies || []);
+        const rawComps = Array.isArray(d) ? d : (d.companies || []);
+        setCompanies(dedupeCompanies(rawComps));
         if (shouldFetchUsers) {
           api.getUsers().then(du => setRecruiters(du.users?.filter((u: any) => ['recruiter', 'tl'].includes(u.role)) || [])).catch(() => {});
         }
@@ -314,6 +287,11 @@ export function CandidateProfilePage() {
     
     if (newStatus === 'Joined') {
       setShowJoiningModal(true);
+      return;
+    }
+
+    if (candidate?.status === 'Joined' && newStatus !== 'Joined') {
+      alert('Candidate status is "Joined" and cannot be changed back to any other status.');
       return;
     }
 
@@ -1692,15 +1670,15 @@ export function CandidateProfilePage() {
           {/* Status Update */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
             <h3 className="text-slate-700 text-sm mb-2" style={{ fontWeight: 600 }}>Update Status</h3>
-            {(isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) && (
+            {(candidate?.status === 'Joined' || isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) && (
               <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
-                <Lock className="w-3 h-3" /> {isLockedForManager ? 'Read-only access' : isLockedForAll ? 'Locked — Admin only' : isBlockedAsDuplicate ? 'Locked — duplicate profile' : isLockedForTL ? 'TL view only — use Second Call section' : 'Locked after first call'}
+                <Lock className="w-3 h-3 text-emerald-600" /> {candidate?.status === 'Joined' ? 'Locked — Candidate status is Joined' : isLockedForManager ? 'Read-only access' : isLockedForAll ? 'Locked — Admin only' : isBlockedAsDuplicate ? 'Locked — duplicate profile' : isLockedForTL ? 'TL view only — use Second Call section' : 'Locked after first call'}
               </p>
             )}
             <div className="space-y-2">
               {STATUS_OPTIONS.map(s => (
                 <button key={s} onClick={() => handleStatusUpdate(s)}
-                  disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager}
+                  disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager || (candidate?.status === 'Joined' && s !== 'Joined')}
                   className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     status === s
                       ? (STATUS_COLORS[s] || 'bg-slate-100 text-slate-600 border-slate-200') + ' border'

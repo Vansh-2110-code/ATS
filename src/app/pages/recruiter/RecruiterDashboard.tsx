@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { getGreeting } from '../../utils/greetingUtils';
 import { SlicerFilteredDataView } from '../../components/SlicerFilteredDataView';
+import { dedupeCompanies } from '../../utils/companyUtils';
 
 // ─── Date Filter ────────────────────────────────────────────
 type DateRange = 'Day' | 'Week' | 'Quarter' | 'Year' | 'All' | 'Custom';
@@ -113,7 +114,8 @@ export function RecruiterDashboard() {
       (api as any).getRecruiters ? (api as any).getRecruiters() : Promise.resolve([]),
       api.getJobs ? api.getJobs({ status: 'Open', limit: '2' }) : Promise.resolve({ jobs: [] })
     ]).then(([compData, recData, jobData]: any) => {
-      setCompanies(Array.isArray(compData) ? compData : (compData?.companies || []));
+      const rawComps = Array.isArray(compData) ? compData : (compData?.companies || []);
+      setCompanies(dedupeCompanies(rawComps));
       setRecruiters(Array.isArray(recData) ? recData : (recData?.users || []));
       setTopJobs(jobData?.jobs || []);
     }).catch(console.error);

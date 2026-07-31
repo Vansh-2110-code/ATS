@@ -336,11 +336,18 @@ exports.adminDashboard = async (req, res, next) => {
       'notes.followUpDate': { $exists: true, $lte: tomorrow },
     });
 
-    // HR Round: candidates in HR Shortlist status
-    const hrRoundCount = await Candidate.countDocuments({ status: 'HR Shortlist' });
+    // Selected count
+    const selectedCount = await Candidate.countDocuments({ status: 'Selected' });
 
-    // Follow to Join: candidates with status 'Yet To Join'
-    const followToJoinCount = await Candidate.countDocuments({ status: 'Yet To Join' });
+    // Operations Round count
+    const opsRoundCount = await Candidate.countDocuments({ status: 'Operations Round' });
+
+    // HR Round: candidates in HR Shortlist / HR Round status
+    const hrRoundCount = await Candidate.countDocuments({ status: { $in: ['HR Shortlist', 'HR Round'] } });
+
+    // Follow to Join / Yet To Join: candidates with status 'Yet To Join'
+    const yetToJoinCount = await Candidate.countDocuments({ status: 'Yet To Join' });
+    const followToJoinCount = yetToJoinCount;
 
     // Joined count
     const joinedCount = await Candidate.countDocuments({ status: 'Joined' });
@@ -348,8 +355,13 @@ exports.adminDashboard = async (req, res, next) => {
     // Rejected count
     const rejectedCount = await Candidate.countDocuments({ status: 'Rejected' });
 
-    // Open Jobs count
-    const openJobsCount = await Job.countDocuments({ status: 'Open' });
+    // Open Jobs & Open Positions count
+    const openJobsAgg = await Job.aggregate([
+      { $match: { status: 'Open' } },
+      { $group: { _id: null, totalPositions: { $sum: '$positions' }, count: { $sum: 1 } } }
+    ]);
+    const openJobsCount = openJobsAgg[0]?.count || await Job.countDocuments({ status: 'Open' });
+    const openPositionsCount = openJobsAgg[0]?.totalPositions || openJobsCount;
 
     // Revenue this month (from Revenue model if it exists)
     let currentMonthRevenue = 0;
@@ -395,14 +407,19 @@ exports.adminDashboard = async (req, res, next) => {
         totalResumes,
         attendanceRate,
         todayLogs,
-        // New dashboard card counts
+        // Dashboard status card counts
         totalCandidates: totalResumes,
         pendingFollowUps,
+        selectedCount,
+        opsRoundCount,
+        operationsRoundCount: opsRoundCount,
         hrRoundCount,
+        yetToJoinCount,
         followToJoinCount,
         joinedCount,
         rejectedCount,
         openJobsCount,
+        openPositionsCount,
         currentMonthRevenue,
       },
       sourceChart: sourceChart.map(s => ({ source: s._id || 'Unknown', count: s.count })),
@@ -563,25 +580,58 @@ exports.allTeamsDashboard = async (req, res, next) => {
 // GET /api/dashboard/division
 exports.divisionDashboard = async (req, res, next) => {
   try {
-    const { division = 'BPO' } = req.query;
+    const { division = 'BPO', company } = req.query;
     const Job = require('../models/Job');
     const Candidate = require('../models/Candidate');
 
+    const jobQuery = { division };
+    const candQuery = { division };
+
+    if (company && company !== 'All Companies') {
+      const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      jobQuery.$or = [
+        { companyName: companyRegex },
+        { client: companyRegex },
+      ];
+      candQuery.$or = [
+        { clientName: companyRegex },
+        { company: companyRegex },
+        { client: companyRegex },
+      ];
+    }
+
     // 1. Open Positions & total JRs
-    const openJobs = await Job.find({ division, status: 'Open' });
+    const openJobs = await Job.find({ ...jobQuery, status: 'Open' });
     const openPositions = openJobs.reduce((sum, j) => sum + (j.positions || 0), 0);
     const totalJRs = openJobs.length;
 
     // 2. Candidates in each stage
-    const screeningCount = await Candidate.countDocuments({ division, currentStage: 'Screening', status: { $ne: 'Rejected' } });
-    const interviewCount = await Candidate.countDocuments({ division, currentStage: 'Interview', status: { $ne: 'Rejected' } });
-    const offerCount = await Candidate.countDocuments({ division, currentStage: 'Offer', status: { $ne: 'Rejected' } });
-    const yetToJoinMatch = { division, $or: [{ status: 'Yet To Join' }, { candidateStatusPostOffer: 'Yet To Join' }, { currentStage: 'Joining', status: { $ne: 'Joined' } }] };
+    const screeningCount = await Candidate.countDocuments({ ...candQuery, currentStage: 'Screening', status: { $ne: 'Rejected' } });
+    const interviewCount = await Candidate.countDocuments({ ...candQuery, currentStage: 'Interview', status: { $ne: 'Rejected' } });
+    const offerCount = await Candidate.countDocuments({ ...candQuery, currentStage: 'Offer', status: { $ne: 'Rejected' } });
+
+    const baseYetToJoinOr = [
+      { status: 'Yet To Join' },
+      { candidateStatusPostOffer: 'Yet To Join' },
+      { currentStage: 'Joining', status: { $ne: 'Joined' } }
+    ];
+
+    const yetToJoinMatch = candQuery.$or ? {
+      $and: [
+        { division },
+        { $or: candQuery.$or },
+        { $or: baseYetToJoinOr }
+      ]
+    } : {
+      division,
+      $or: baseYetToJoinOr
+    };
+
     const yetToJoinCount = await Candidate.countDocuments(yetToJoinMatch);
-    const joinedCount = await Candidate.countDocuments({ division, status: 'Joined' });
+    const joinedCount = await Candidate.countDocuments({ ...candQuery, status: 'Joined' });
 
     // 3. Joined Candidates with Date of Joining
-    const joinedCandidates = await Candidate.find({ division, status: 'Joined' })
+    const joinedCandidates = await Candidate.find({ ...candQuery, status: 'Joined' })
       .select('name positionApplied clientName dateOfJoining assignedRecruiterName status')
       .sort('-dateOfJoining');
 
@@ -592,6 +642,7 @@ exports.divisionDashboard = async (req, res, next) => {
 
     res.json({
       division,
+      company: company || 'All Companies',
       openPositions,
       totalJRs,
       pipeline: {

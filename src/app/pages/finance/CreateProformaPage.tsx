@@ -7,6 +7,7 @@ import {
 import api from '../../services/api';
 import { ProformaInvoiceTemplate } from '../../components/ProformaInvoiceTemplate';
 import { convertNumberToWords } from '../../utils/numberToWords';
+import { dedupeCompanies } from '../../utils/companyUtils';
 
 interface Candidate {
   _id: string;
@@ -100,7 +101,8 @@ export function CreateProformaPage() {
           api.getCompanies?.() || Promise.resolve([]),
         ]);
         setCandidates(Array.isArray(candRes) ? candRes : candRes.candidates || []);
-        setCompanies(Array.isArray(compRes) ? compRes : compRes.companies || []);
+        const rawComps = Array.isArray(compRes) ? compRes : compRes.companies || [];
+        setCompanies(dedupeCompanies(rawComps));
 
         // If editing existing proforma
         if (id) {

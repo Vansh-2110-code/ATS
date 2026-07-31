@@ -350,7 +350,11 @@ export function TeamStructureManager() {
                 onChange={e => setSelectedNewMemberId(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
               >
-                <option value="">-- Choose a recruiter --</option>
+                {availableRecruiters.length === 0 ? (
+                  <option value="" disabled>No unassigned recruiters available</option>
+                ) : (
+                  <option value="">-- Choose an unassigned recruiter --</option>
+                )}
                 {availableRecruiters.map(emp => (
                   <option key={emp._id} value={emp._id}>{emp.name} ({emp.employeeId})</option>
                 ))}

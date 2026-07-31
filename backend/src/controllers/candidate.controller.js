@@ -8,11 +8,14 @@ const ExcelJS = require('exceljs');
 const notificationService = require('../utils/notification.service');
 const validator = require('validator');
 
-// GET /api/candidates/clients — distinct clientName values for filter dropdowns
+// GET /api/candidates/clients — created company names for filter dropdowns
 exports.listClientNames = async (req, res, next) => {
   try {
-    const names = await Candidate.distinct('clientName', { clientName: { $ne: null, $nin: ['', null] } });
-    res.json(names.filter(Boolean).sort());
+    const Company = require('../models/Company');
+    const companies = await Company.find().select('companyName').collation({ locale: 'en', strength: 2 }).sort({ companyName: 1 });
+    const names = companies.map(c => c.companyName).filter(Boolean);
+    const uniqueSorted = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    res.json(uniqueSorted);
   } catch (err) {
     next(err);
   }
@@ -547,6 +550,21 @@ if (typeof data.skills === 'string') {
     const existing = await Candidate.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Candidate not found' });
 
+    // Joined Status Lock: Once candidate has status 'Joined', it cannot be changed back to any other status
+    if (existing.status === 'Joined') {
+      if (data.status && data.status !== 'Joined') {
+        return res.status(403).json({ message: 'Candidate status is "Joined" and cannot be changed back to any other status.' });
+      }
+      let newMapped = null;
+      if (data.candidateStatusPostOffer) newMapped = mapSubStatusToGlobalStatus(data.candidateStatusPostOffer);
+      else if (data.finalInterviewStatus) newMapped = mapSubStatusToGlobalStatus(data.finalInterviewStatus);
+      else if (data.interviewStatus) newMapped = mapSubStatusToGlobalStatus(data.interviewStatus);
+      else if (data.firstCallStatus) newMapped = mapSubStatusToGlobalStatus(data.firstCallStatus);
+      if (newMapped && newMapped !== 'Joined') {
+        return res.status(403).json({ message: 'Candidate status is "Joined" and cannot be changed back to any other status.' });
+      }
+    }
+
     // Ownership check
     const lastActivity = existing.assignedAt || existing.createdAt;
     const daysSinceAssignment = Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24));
@@ -791,6 +809,11 @@ exports.updateStatus = async (req, res, next) => {
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) {
       return res.status(404).json({ message: 'Candidate not found' });
+    }
+
+    // Joined Status Lock: Once candidate has status 'Joined', it cannot be changed back to any other status
+    if (candidate.status === 'Joined' && status !== 'Joined') {
+      return res.status(403).json({ message: 'Candidate status is "Joined" and cannot be changed back to any other status.' });
     }
 
     if (candidate.isDuplicate && req.user.role !== 'admin') {

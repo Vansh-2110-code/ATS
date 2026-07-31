@@ -111,7 +111,7 @@ export function UserManagementPage() {
           role: u.role || 'recruiter',
           roles: u.roles || [u.role || 'recruiter'],
           isWFH: u.isWFH ?? false,
-          status: u.isActive === false ? 'Suspended' as const : 'Active' as const,
+          status: u.status ? (u.status as 'Active' | 'Suspended') : (u.isActive === false ? 'Suspended' as const : 'Active' as const),
           lastLogin: u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '—',
           joinedDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
           pseudoName: u.pseudoName || u.aliasName || '',
@@ -257,8 +257,9 @@ const getHighestRole = (roles: Role[]): Role => {
 
   const toggleStatus = async (id: string) => {
     try {
-      await api.toggleUserStatus(id);
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'Active' ? 'Suspended' as const : 'Active' as const } : u));
+      const res = await api.toggleUserStatus(id);
+      const serverStatus = res?.status;
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: serverStatus || (u.status === 'Active' ? 'Suspended' as const : 'Active' as const) } : u));
     } catch (err) {
       console.error('Failed to toggle status:', err);
     }

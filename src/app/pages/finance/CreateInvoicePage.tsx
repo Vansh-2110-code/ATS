@@ -7,6 +7,7 @@ import {
 import api from '../../services/api';
 import { InvoiceTemplate } from '../../components/InvoiceTemplate';
 import { convertNumberToWords } from '../../utils/numberToWords';
+import { dedupeCompanies } from '../../utils/companyUtils';
 
 interface Candidate {
   _id: string;
@@ -109,7 +110,8 @@ export function CreateInvoicePage() {
           api.getNextInvoiceNumber?.() || Promise.resolve({ nextNumber: '' }),
         ]);
         setCandidates(Array.isArray(candRes) ? candRes : candRes.candidates || []);
-        setCompanies(Array.isArray(compRes) ? compRes : compRes.companies || []);
+        const rawComps = Array.isArray(compRes) ? compRes : compRes.companies || [];
+        setCompanies(dedupeCompanies(rawComps));
         if (nextNumRes?.nextNumber) {
           set('invoiceNumber', nextNumRes.nextNumber);
         }

@@ -7,35 +7,20 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { dedupeCompanies } from '../../utils/companyUtils';
+import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS } from '../../utils/candidateStatusUtils';
 
 const API_BASE = window.location.origin;
 
 // ── Extended status list ──────────────────────────────────────
-const STATUS_COLORS: Record<string, string> = {
-  New:                  'bg-slate-100 text-slate-600',
-  Contacted:            'bg-green-100 text-green-700',
-  Interested:           'bg-emerald-100 text-emerald-700',
-  'Interview Scheduled':'bg-violet-100 text-violet-700',
-  Selected:             'bg-teal-100 text-teal-700',
-  Rejected:             'bg-red-100 text-red-600',
-  'Eligible Candidates':'bg-emerald-100 text-emerald-700',
-  'Wrong Number':       'bg-red-100 text-red-600',
-  'Did Not Pick':       'bg-orange-100 text-orange-700',
-  'Call Back':          'bg-amber-100 text-amber-700',
-  'HR Shortlist':       'bg-violet-100 text-violet-700',
-  'Written Test':       'bg-indigo-100 text-indigo-700',
-  'Operations Round':   'bg-cyan-100 text-cyan-700',
-  Documentation:        'bg-sky-100 text-sky-700',
-  'Yet To Join':        'bg-pink-100 text-pink-700',
-  Joined:               'bg-green-100 text-green-700',
-};
+const STATUS_COLORS: Record<string, string> = CANDIDATE_STATUS_COLORS;
 
 // ── Extended source list ──────────────────────────────────────
 const SOURCES = [
   'All Sources', 'Naukri', 'LinkedIn', 'Indeed', 'Referral',
   'Walk-In', 'Shine', 'Facebook', 'Social Media', 'Excel Import'
 ];
-const STATUSES = ['All Status', ...Object.keys(STATUS_COLORS)];
+const STATUSES = ['All Status', ...CANDIDATE_STATUS_OPTIONS];
 
 // ── Location data ─────────────────────────────────────────────
 const CITIES = ['', 'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata', 'Ahmedabad'];
@@ -97,6 +82,20 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const [importError, setImportError] = useState('');
   const [multiValueAction, setMultiValueAction] = useState<'clean' | 'keep'>('clean');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleTopScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  };
 
   // Selection and Bulk Actions state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -155,14 +154,14 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
     if (locationState?.statusFilter) setStatusFilter(locationState.statusFilter);
   }, [locationState?.statusFilter]);
 
-  // Fetch companies for dropdown
+  // Fetch companies for dropdown (ONLY created companies)
   useEffect(() => {
     if ((api as any).getCompanyList) {
       (api as any).getCompanyList()
         .then((data: any) => {
           const list = Array.isArray(data) ? data : (data.companies || []);
-          const names = list.map((c: any) => c.companyName || c.name || c).filter(Boolean);
-          setCompanyList(names);
+          const uniqueSorted = dedupeCompanies(list).map((c: any) => typeof c === 'string' ? c : c.companyName || c.name || '').filter(Boolean);
+          setCompanyList(uniqueSorted as string[]);
         })
         .catch(() => {});
     }
@@ -691,12 +690,10 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                 className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-44"
               >
                 <option value="All Companies">All Companies</option>
-                {Array.from(new Set([
-                  ...companyList,
-                  ...candidates.map(c => c.clientName || c.company).filter(Boolean)
-                ])).sort().map(comp => (
-                  <option key={comp} value={comp}>{comp}</option>
-                ))}
+                {dedupeCompanies(companyList).map(comp => {
+                  const val = typeof comp === 'string' ? comp : comp.companyName;
+                  return <option key={val} value={val}>{val}</option>;
+                })}
               </select>
             </div>
 
@@ -753,11 +750,31 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead>
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+        {/* Top Horizontal Scrollbar Bar */}
+        <div className="hidden md:flex items-center justify-between px-4 py-2 bg-slate-100/90 border-b border-slate-200 text-xs text-slate-600 font-medium">
+          <div className="flex items-center gap-1.5 flex-shrink-0 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span>Top Scrollbar</span>
+          </div>
+          <div
+            ref={topScrollRef}
+            onScroll={handleTopScroll}
+            className="overflow-x-auto max-w-full flex-1 ml-4 py-0.5 cursor-pointer"
+            style={{ scrollbarWidth: 'auto' }}
+          >
+            <div style={{ width: '1400px', height: '1px' }} />
+          </div>
+        </div>
+
+        {/* Desktop Table Container */}
+        <div
+          ref={tableScrollRef}
+          onScroll={handleTableScroll}
+          className="hidden md:block overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto"
+        >
+          <table className="w-full border-collapse">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="px-5 py-3 text-left w-10">
                   <input

@@ -3,7 +3,7 @@ const Company = require('../models/Company');
 // GET /api/companies
 exports.list = async (req, res, next) => {
   try {
-    const { search, page = 1, limit = 50 } = req.query;
+    const { search, page, limit, dedupe = 'true', sort = 'name' } = req.query;
     const query = {};
     if (search) {
       query.$or = [
@@ -12,11 +12,28 @@ exports.list = async (req, res, next) => {
         { city: { $regex: search, $options: 'i' } },
       ];
     }
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [companies, total] = await Promise.all([
-      Company.find(query).sort('-createdAt').skip(skip).limit(parseInt(limit)),
-      Company.countDocuments(query),
-    ]);
+    
+    let companies = await Company.find(query).collation({ locale: 'en', strength: 2 }).sort({ companyName: 1 });
+
+    if (dedupe !== 'false') {
+      const seen = new Set();
+      companies = companies.filter(c => {
+        const name = (c.companyName || '').trim().toLowerCase();
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      });
+    }
+
+    companies.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || '', undefined, { numeric: true, sensitivity: 'base' }));
+
+    const total = companies.length;
+
+    if (page && limit) {
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      companies = companies.slice(skip, skip + parseInt(limit));
+    }
+
     res.json({ companies, total });
   } catch (err) {
     next(err);
@@ -26,19 +43,19 @@ exports.list = async (req, res, next) => {
 // POST /api/companies
 exports.create = async (req, res, next) => {
   try {
-    const company = await Company.create({ ...req.body, createdBy: req.user._id });
+    const companyName = (req.body.companyName || '').trim();
+    if (!companyName) {
+      return res.status(400).json({ message: 'Company name is required' });
+    }
+    const existing = await Company.findOne({
+      companyName: { $regex: `^${companyName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: 'i' }
+    });
+    if (existing) {
+      return res.status(400).json({ message: `Company "${existing.companyName}" already exists.` });
+    }
+    const company = await Company.create({ ...req.body, companyName, createdBy: req.user._id });
     res.status(201).json(company);
   } catch (err) {
-    // If a legacy unique index fires, retry with insertOne to bypass it
-    if (err.code === 11000 && err.keyPattern && err.keyPattern.companyName) {
-      try {
-        const doc = new Company({ ...req.body, createdBy: req.user._id });
-        await Company.collection.insertOne(doc.toObject());
-        return res.status(201).json(doc);
-      } catch (retryErr) {
-        return next(retryErr);
-      }
-    }
     next(err);
   }
 };

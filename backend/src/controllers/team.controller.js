@@ -67,14 +67,13 @@ exports.addTeamMember = async (req, res) => {
       return res.status(404).json({ message: 'Recruiter not found' });
     }
 
-    // Check if already assigned
+    // Check if already assigned to ANY team leader
     const existing = await TeamMember.findOne({
-      teamLeaderId: targetTlId,
       memberId: recruiter._id,
     });
 
     if (existing) {
-      return res.status(400).json({ message: 'Recruiter already in your team' });
+      return res.status(400).json({ message: 'Recruiter is already assigned to a Team Leader' });
     }
 
     // Create team member record
@@ -220,31 +219,37 @@ exports.removeTeamLeader = async (req, res) => {
 exports.getAvailableEmployees = async (req, res) => {
   try {
     const { role } = req.query;
-    const tlUser = req.user;
 
-    // Build query
     let query = {};
     if (role === 'recruiter') {
       query = { role: 'recruiter' };
     } else if (role === 'tl') {
-      query = { role: { $in: ['recruiter'] } }; // Can nominate from recruiters
+      query = { role: { $in: ['recruiter'] } };
     }
 
-    // Get requested employees
     const employees = await User.find(query)
       .select('name email employeeId role _id')
       .lean()
       .exec();
 
-    // If TL requesting, filter out already assigned members
-    if (tlUser.role === 'tl') {
-      const assignedIds = await TeamMember.find({ teamLeaderId: tlUser._id })
+    // Filter out recruiters who are ALREADY assigned to ANY Team Leader
+    if (role === 'recruiter') {
+      const assignedRecords = await TeamMember.find({})
         .select('memberId')
         .lean()
         .exec();
 
-      const assignedSet = new Set(assignedIds.map(m => m.memberId.toString()));
+      const assignedSet = new Set(assignedRecords.map(m => m.memberId ? m.memberId.toString() : ''));
       const available = employees.filter(emp => !assignedSet.has(emp._id.toString()));
+
+      return res.json({ success: true, employees: available });
+    }
+
+    // Filter out employees who are ALREADY Team Leaders
+    if (role === 'tl') {
+      const existingTLs = await User.find({ role: 'tl' }).select('_id').lean();
+      const tlSet = new Set(existingTLs.map(t => t._id.toString()));
+      const available = employees.filter(emp => !tlSet.has(emp._id.toString()));
 
       return res.json({ success: true, employees: available });
     }

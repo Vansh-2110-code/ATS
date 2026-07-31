@@ -155,7 +155,8 @@ exports.toggleStatus = async (req, res, next) => {
 
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.status = user.status === 'Active' ? 'Suspended' : 'Active';
+    const isCurrentlyActive = user.status !== 'Suspended';
+    user.status = isCurrentlyActive ? 'Suspended' : 'Active';
     await user.save();
 
     await createLog({

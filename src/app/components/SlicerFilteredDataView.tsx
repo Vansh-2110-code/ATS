@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { X, Filter, Loader2, UserCheck, Eye, Phone, Calendar } from 'lucide-react';
 import api from '../services/api';
@@ -24,6 +24,20 @@ export function SlicerFilteredDataView({
 }: SlicerFilteredDataViewProps) {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleTopScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  };
 
   useEffect(() => {
     if (!slicerName || slicerName === 'All') {
@@ -98,10 +112,31 @@ export function SlicerFilteredDataView({
           No candidate records found matching status: <strong className="text-slate-600">"{slicerName}"</strong>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wider">
+        <div className="flex flex-col">
+          {/* Top Horizontal Scrollbar Bar */}
+          <div className="flex items-center justify-between px-4 py-1.5 bg-slate-100/90 border-b border-slate-200 text-xs text-slate-600 font-medium">
+            <div className="flex items-center gap-1.5 flex-shrink-0 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span>Top Scrollbar</span>
+            </div>
+            <div
+              ref={topScrollRef}
+              onScroll={handleTopScroll}
+              className="overflow-x-auto max-w-full flex-1 ml-4 py-0.5 cursor-pointer"
+              style={{ scrollbarWidth: 'auto' }}
+            >
+              <div style={{ width: '1200px', height: '1px' }} />
+            </div>
+          </div>
+
+          <div
+            ref={tableScrollRef}
+            onScroll={handleTableScroll}
+            className="overflow-x-auto max-h-[450px] overflow-y-auto"
+          >
+            <table className="w-full text-xs border-collapse">
+              <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wider">
                 <th className="px-5 py-3 font-semibold">Candidate Name</th>
                 <th className="px-5 py-3 font-semibold">Contact / Phone</th>
                 <th className="px-5 py-3 font-semibold">Position Applied</th>
@@ -148,7 +183,8 @@ export function SlicerFilteredDataView({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
     </div>

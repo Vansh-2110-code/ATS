@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { dedupeCompanies } from '../../utils/companyUtils';
 
 // const DEPARTMENTS = ['BPO', 'ITES', 'IT', 'Non-IT', 'Healthcare', 'Sales', 'Finance'];
 const JOB_TYPES = ['Full-Time', 'Part-Time', 'Contract', 'Internship', 'Freelance'];
@@ -62,11 +63,13 @@ export function JobCreatePage() {
 
   useEffect(() => {
     api.getRecruiters().then((data: any) => {
-      setRecruitersList(Array.isArray(data) ? data : (data.users || data.recruiters || []));
+      const list = Array.isArray(data) ? data : (data.users || data.recruiters || []);
+      setRecruitersList([...list].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })));
     }).catch(() => {});
     
     api.getCompanyList().then((data: any) => {
-      setCompaniesList(Array.isArray(data) ? data : (data.companies || []));
+      const raw = Array.isArray(data) ? data : (data.companies || []);
+      setCompaniesList(dedupeCompanies(raw));
     }).catch(() => {});
   }, []);
 
@@ -196,8 +199,8 @@ export function JobCreatePage() {
                 className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-green-400 transition-colors bg-white appearance-none"
               >
                 <option value="" disabled>Select Company</option>
-                {companiesList.map((c: any) => (
-                  <option key={c._id || c.id} value={c.companyName}>{c.companyName}</option>
+                {dedupeCompanies(companiesList).map((c: any) => (
+                  <option key={c._id || c.id || c.companyName} value={c.companyName}>{c.companyName}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />

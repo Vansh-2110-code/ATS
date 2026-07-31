@@ -595,12 +595,17 @@ class ApiService {
     });
   }
 
-  async getDivisionDashboard(division: string) {
-    return this.request<any>(`/dashboard/division?division=${encodeURIComponent(division)}`);
+  async getDivisionDashboard(division: string, company?: string) {
+    const params = new URLSearchParams({ division });
+    if (company && company !== 'All Companies') params.append('company', company);
+    return this.request<any>(`/dashboard/division?${params.toString()}`);
   }
 
   async getClientNames(): Promise<string[]> {
-    return this.request<string[]>('/candidates/clients');
+    const res = await this.request<any>('/companies');
+    const list = Array.isArray(res) ? res : (res.companies || []);
+    const names = list.map((c: any) => c.companyName || c.name || '').filter(Boolean);
+    return Array.from(new Set(names)).sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }
 
   async getAdvancedReports(params: Record<string, string> = {}) {

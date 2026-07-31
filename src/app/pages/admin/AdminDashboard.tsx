@@ -18,6 +18,7 @@ import { getGreeting } from '../../utils/greetingUtils';
 import { TeamStructureManager } from '../../components/TeamStructureManager';
 import { TeamPerformanceReviews } from '../../components/TeamPerformanceReviews';
 import { SlicerFilteredDataView } from '../../components/SlicerFilteredDataView';
+import { dedupeCompanies } from '../../utils/companyUtils';
 
 // ─── Source Links ─────────────────────────────────────────────────────────────
 const SOURCE_LINKS: Record<string, string> = {
@@ -505,9 +506,13 @@ export function AdminDashboard() {
   }, [dateRange, customFrom, customTo, recDivision, recruiterFilter]);
 
   // ── Division Dashboard loader ───────────────────────────────────────────────
-  // Load all client names once (independent of division filter)
+  // Load ONLY created companies from Company Management (deduplicated & sorted A-Z)
   useEffect(() => {
-    api.getClientNames().then(setAllClientNames).catch(() => {});
+    api.getCompanyList().then((data: any) => {
+      const raw = Array.isArray(data) ? data : (data.companies || []);
+      const uniqueSorted = dedupeCompanies(raw).map((c: any) => typeof c === 'string' ? c : c.companyName || c.name || '').filter(Boolean);
+      setAllClientNames(uniqueSorted as string[]);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -515,7 +520,7 @@ export function AdminDashboard() {
       const loadDiv = async () => {
         try {
           setDivLoading(true);
-          const data = await api.getDivisionDashboard(activeDivision);
+          const data = await api.getDivisionDashboard(activeDivision, divCompanyFilter);
           setDivisionData(data);
         } catch (err) {
           console.error('Failed to load division dashboard:', err);
@@ -525,7 +530,7 @@ export function AdminDashboard() {
       };
       loadDiv();
     }
-  }, [activeTab, activeDivision]);
+  }, [activeTab, activeDivision, divCompanyFilter]);
 
   // ── Derived values ───────────────────────────────────────────────────────────
   const STATUS_CARDS = dashData?.pipeline
@@ -640,53 +645,107 @@ export function AdminDashboard() {
       {/* ══════════════ TAB: OVERVIEW ══════════════ */}
       {activeTab === 'overview' && (
         <>
-          {/* System Metrics */}
-          {/* System & Recruitment Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-            {[
-              { label: 'Active Logins Today', value: adminMetrics.activeLogins ?? '—', sub: 'System Users',  icon: Monitor,        color: 'blue',    href: '/admin/attendance' },
-              { label: 'Attendance Rate',     value: adminMetrics.attendanceRate ? `${adminMetrics.attendanceRate}%` : '—', sub: 'System Users', icon: Clock, color: 'emerald', href: '/admin/attendance' },
-              { label: 'Pending Alerts',      value: alerts.length || '0', sub: `${alerts.filter((a: any) => a.type === 'error').length} critical`, icon: AlertTriangle, color: 'amber', href: '/admin/logs' },
-              { label: 'Total Candidate Revenue', value: fmt(totalCandidateRevenue), sub: 'From Placements', icon: DollarSign, color: 'emerald', href: 'tab:analytics' },
-              { label: 'Revenue (This Month)',value: adminMetrics.currentMonthRevenue ? fmt(adminMetrics.currentMonthRevenue) : '₹0', sub: 'Business', icon: DollarSign, color: 'emerald', href: '/revenue' },
-              { label: 'Total Candidates',    value: adminMetrics.totalCandidates ?? '—', sub: 'Resume DB', icon: Users, color: 'violet', href: '/recruiter/resumes' },
-              { label: 'Pending Follow-ups',  value: adminMetrics.pendingFollowUps ?? '0', sub: 'Action Required', icon: AlertCircle, color: 'amber', href: '/tl/follow-ups' },
-              { label: 'HR Round',            value: adminMetrics.hrRoundCount ?? '0', sub: 'In Progress', icon: ClipboardList, color: 'blue', href: '/admin/candidates?statusFilter=HR%20Shortlist' },
-              { label: 'Follow to Join',      value: adminMetrics.followToJoinCount ?? '0', sub: 'Pipeline', icon: UserCheck, color: 'violet', href: '/admin/candidates?statusFilter=Yet%20To%20Join' },
-              { label: 'Joined Candidates',   value: adminMetrics.joinedCount ?? '0', sub: 'Successfully Placed', icon: CheckCircle2, color: 'emerald', href: '/admin/candidates?statusFilter=Joined' },
-              { label: 'Rejected Candidates', value: adminMetrics.rejectedCount ?? '0', sub: 'Closed/Dropped', icon: X, color: 'red', href: '/admin/candidates?statusFilter=Rejected' },
-              { label: 'Open Jobs',           value: adminMetrics.openJobsCount ?? '0', sub: 'Active Requirements', icon: Briefcase, color: 'blue', href: '/admin/jobs?status=Open' },
-            ].map((m, i) => {
-              const Icon = m.icon;
-              const bg: Record<string, string> = {
-                blue: 'bg-blue-50 text-blue-600', emerald: 'bg-emerald-50 text-emerald-600',
-                violet: 'bg-violet-50 text-violet-600', amber: 'bg-amber-50 text-amber-600',
-                red: 'bg-red-50 text-red-600'
-              };
-              // Determine correct link navigation
-              const handleClick = () => {
-                if (m.href.includes('statusFilter=')) {
-                  const status = decodeURIComponent(m.href.split('statusFilter=')[1]);
-                  navigate('/admin/candidates', { state: { statusFilter: status } });
-                } else if (m.href.includes('status=')) {
-                  navigate('/admin/jobs');
-                } else if (m.href.startsWith('tab:')) {
-                  setActiveTab(m.href.replace('tab:', '') as any);
-                } else {
-                  navigate(m.href);
-                }
-              };
-              
-              return (
-                <button key={i} onClick={handleClick}
-                  className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer w-full">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${bg[m.color]}`}><Icon className="w-4 h-4" /></div>
-                  <div className="text-slate-800 mb-0.5" style={{ fontWeight: 700, fontSize: '1.75rem' }}>{m.value}</div>
-                  <div className="text-slate-500 text-sm">{m.label}</div>
-                  <div className="text-slate-400 text-xs mt-0.5">{m.sub}</div>
-                </button>
-              );
-            })}
+          {/* Top Row: Pipeline Statuses */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-slate-700 text-xs font-bold uppercase tracking-wider">Recruitment Pipeline Statuses</h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { label: 'Open Positions', value: adminMetrics.openPositionsCount ?? adminMetrics.openJobsCount ?? '0', sub: 'Active Vacancies', icon: Briefcase, color: 'blue', href: '/admin/jobs?status=Open' },
+                { label: 'Selected', value: adminMetrics.selectedCount ?? '0', sub: 'Offered Candidates', icon: BadgeCheck, color: 'emerald', href: '/admin/candidates?statusFilter=Selected' },
+                { label: 'Operations Round', value: adminMetrics.opsRoundCount ?? adminMetrics.operationsRoundCount ?? '0', sub: 'In Ops Round', icon: Building2, color: 'violet', href: '/admin/candidates?statusFilter=Operations%20Round' },
+                { label: 'HR Round', value: adminMetrics.hrRoundCount ?? '0', sub: 'In HR Round', icon: ClipboardList, color: 'amber', href: '/admin/candidates?statusFilter=HR%20Shortlist' },
+                { label: 'Yet to Join', value: adminMetrics.yetToJoinCount ?? adminMetrics.followToJoinCount ?? '0', sub: 'Offer Accepted', icon: UserCheck, color: 'purple', href: '/admin/candidates?statusFilter=Yet%20To%20Join' },
+                { label: 'Joined', value: adminMetrics.joinedCount ?? '0', sub: 'Successfully Placed', icon: CheckCircle2, color: 'green', href: '/admin/candidates?statusFilter=Joined' },
+              ].map((m, i) => {
+                const Icon = m.icon;
+                const bg: Record<string, string> = {
+                  blue: 'bg-blue-50 text-blue-600 border-blue-100',
+                  emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                  violet: 'bg-violet-50 text-violet-600 border-violet-100',
+                  amber: 'bg-amber-50 text-amber-600 border-amber-100',
+                  purple: 'bg-purple-50 text-purple-600 border-purple-100',
+                  green: 'bg-green-50 text-green-600 border-green-100',
+                };
+                const handleClick = () => {
+                  if (m.href.includes('statusFilter=')) {
+                    const status = decodeURIComponent(m.href.split('statusFilter=')[1]);
+                    navigate('/admin/candidates', { state: { statusFilter: status } });
+                  } else if (m.href.includes('status=')) {
+                    navigate('/admin/jobs');
+                  } else {
+                    navigate(m.href);
+                  }
+                };
+                return (
+                  <button key={i} onClick={handleClick}
+                    className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer w-full flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider truncate max-w-[80%]">{m.label}</span>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center border ${bg[m.color]}`}><Icon className="w-3.5 h-3.5" /></div>
+                    </div>
+                    <div>
+                      <div className="text-xl text-slate-800" style={{ fontWeight: 700 }}>{m.value}</div>
+                      <div className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{m.sub}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Second Row: System & Business Metrics */}
+          <div className="space-y-2 mb-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-slate-700 text-xs font-bold uppercase tracking-wider">System & Business Metrics</h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {[
+                { label: 'Active Logins Today', value: adminMetrics.activeLogins ?? '—', sub: 'System Users', icon: Monitor, color: 'blue', href: '/admin/attendance' },
+                { label: 'Attendance Rate', value: adminMetrics.attendanceRate ? `${adminMetrics.attendanceRate}%` : '—', sub: 'System Users', icon: Clock, color: 'emerald', href: '/admin/attendance' },
+                { label: 'Pending Alerts', value: alerts.length || '0', sub: `${alerts.filter((a: any) => a.type === 'error').length} critical`, icon: AlertTriangle, color: 'amber', href: '/admin/logs' },
+                { label: 'Total Candidate Revenue', value: fmt(totalCandidateRevenue), sub: 'From Placements', icon: DollarSign, color: 'emerald', href: 'tab:analytics' },
+                { label: 'Revenue (This Month)', value: adminMetrics.currentMonthRevenue ? fmt(adminMetrics.currentMonthRevenue) : '₹0', sub: 'Business', icon: DollarSign, color: 'emerald', href: '/revenue' },
+                { label: 'Total Candidates', value: adminMetrics.totalCandidates ?? '—', sub: 'Resume DB', icon: Users, color: 'violet', href: '/recruiter/resumes' },
+                { label: 'Pending Follow-ups', value: adminMetrics.pendingFollowUps ?? '0', sub: 'Action Required', icon: AlertCircle, color: 'amber', href: '/tl/follow-ups' },
+                { label: 'Rejected Candidates', value: adminMetrics.rejectedCount ?? '0', sub: 'Closed/Dropped', icon: X, color: 'red', href: '/admin/candidates?statusFilter=Rejected' },
+              ].map((m, i) => {
+                const Icon = m.icon;
+                const bg: Record<string, string> = {
+                  blue: 'bg-blue-50 text-blue-600 border-blue-100',
+                  emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                  violet: 'bg-violet-50 text-violet-600 border-violet-100',
+                  amber: 'bg-amber-50 text-amber-600 border-amber-100',
+                  red: 'bg-red-50 text-red-600 border-red-100',
+                };
+                const handleClick = () => {
+                  if (m.href.includes('statusFilter=')) {
+                    const status = decodeURIComponent(m.href.split('statusFilter=')[1]);
+                    navigate('/admin/candidates', { state: { statusFilter: status } });
+                  } else if (m.href.includes('status=')) {
+                    navigate('/admin/jobs');
+                  } else if (m.href.startsWith('tab:')) {
+                    setActiveTab(m.href.replace('tab:', '') as any);
+                  } else {
+                    navigate(m.href);
+                  }
+                };
+                return (
+                  <button key={i} onClick={handleClick}
+                    className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer w-full flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider truncate max-w-[80%]">{m.label}</span>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center border ${bg[m.color]}`}><Icon className="w-3.5 h-3.5" /></div>
+                    </div>
+                    <div>
+                      <div className="text-xl text-slate-800" style={{ fontWeight: 700 }}>{m.value}</div>
+                      <div className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{m.sub}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mb-5">
