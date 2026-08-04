@@ -155,7 +155,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   });
 
   const handleLogout = () => {
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.disableBiometric) {
       completeLogout();
     } else {
       setShowCheckOutFaceModal(true);
@@ -268,6 +268,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       <FaceVerificationModal
         isOpen={showCheckOutFaceModal}
+        disableBiometric={user.disableBiometric}
         onClose={() => setShowCheckOutFaceModal(false)}
         onSuccess={(descriptor, photo) => {
           setShowCheckOutFaceModal(false);

@@ -149,10 +149,17 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
     }
   };
 
-  // Sync status filter from navigation state
+  // Sync status, company, and division filters from navigation state or URL search params
   useEffect(() => {
-    if (locationState?.statusFilter) setStatusFilter(locationState.statusFilter);
-  }, [locationState?.statusFilter]);
+    const params = new URLSearchParams(location.search);
+    const sFilter = params.get('statusFilter') || params.get('status') || locationState?.statusFilter;
+    const cFilter = params.get('clientName') || params.get('company') || params.get('customer');
+    const dFilter = params.get('division');
+
+    if (sFilter) setStatusFilter(sFilter);
+    if (cFilter) setCompanyFilter(cFilter);
+    if (dFilter) setDivisionFilter(dFilter);
+  }, [location.search, locationState?.statusFilter]);
 
   // Fetch companies for dropdown (ONLY created companies)
   useEffect(() => {

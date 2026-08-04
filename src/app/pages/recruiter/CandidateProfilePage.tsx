@@ -159,10 +159,10 @@ export function CandidateProfilePage() {
 
   // ── Lock state ───────────────────────────────────────────────
   const isBlockedAsDuplicate = candidate?.isDuplicate && !isAdmin;
-  const isLockedForRecruiter = candidate?.firstCallSubmitted && isRecruiter;
-  const isLockedForTL = false; // TL can edit now
-  const isLockedForAll = candidate?.tlCallSubmitted && !isAdmin;
-  const isLockedForManager = false; // Managers can edit now
+  const isLockedForRecruiter = false; // Recruiters can edit/update candidate status until status is Joined
+  const isLockedForTL = false;
+  const isLockedForAll = false;
+  const isLockedForManager = false;
   const isInactive = candidate?.candidateActiveStatus === 'Inactive';
   const isFinalInterviewLocked = candidate?.finalInterviewLocked && !isAdmin;
 
@@ -283,7 +283,7 @@ export function CandidateProfilePage() {
   }, [id]);
 
   const handleStatusUpdate = async (newStatus: string) => {
-    if (isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) return;
+    if (isBlockedAsDuplicate) return;
     
     if (newStatus === 'Joined') {
       setShowJoiningModal(true);
@@ -1241,8 +1241,8 @@ export function CandidateProfilePage() {
                 </div>
               ))}
             </div>
-            {/* Only allow notes if not locked */}
-            {!isLockedForAll && !isLockedForRecruiter && !isLockedForTL && !isBlockedAsDuplicate && !isLockedForManager && (
+            {/* Only allow notes if not duplicate */}
+            {!isBlockedAsDuplicate && (
               <div className="space-y-3">
                 <textarea value={note} onChange={e => setNote(e.target.value)}
                   placeholder="Add a note..." rows={2}
@@ -1257,18 +1257,10 @@ export function CandidateProfilePage() {
                 </div>
               </div>
             )}
-            {isLockedForTL && !isLockedForAll && (
+            {isBlockedAsDuplicate && (
               <p className="text-slate-400 text-xs text-center py-2 flex items-center justify-center gap-1">
-                <Lock className="w-3 h-3" /> Notes are view-only — use Second Call section for observations.
+                <Lock className="w-3 h-3 text-emerald-600" /> Notes are disabled — duplicate profile.
               </p>
-            )}
-            {isLockedForRecruiter && !isLockedForAll && (
-              <p className="text-slate-400 text-xs text-center py-2 flex items-center justify-center gap-1">
-                <Lock className="w-3 h-3" /> Notes are view-only — profile locked after first call submission.
-              </p>
-            )}
-            {isLockedForAll && (
-              <p className="text-slate-400 text-xs text-center py-2">Notes are view-only. Profile is fully locked.</p>
             )}
           </div>
 
@@ -1670,15 +1662,15 @@ export function CandidateProfilePage() {
           {/* Status Update */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
             <h3 className="text-slate-700 text-sm mb-2" style={{ fontWeight: 600 }}>Update Status</h3>
-            {(candidate?.status === 'Joined' || isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) && (
+            {(candidate?.status === 'Joined' || isBlockedAsDuplicate) && (
               <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
-                <Lock className="w-3 h-3 text-emerald-600" /> {candidate?.status === 'Joined' ? 'Locked — Candidate status is Joined' : isLockedForManager ? 'Read-only access' : isLockedForAll ? 'Locked — Admin only' : isBlockedAsDuplicate ? 'Locked — duplicate profile' : isLockedForTL ? 'TL view only — use Second Call section' : 'Locked after first call'}
+                <Lock className="w-3 h-3 text-emerald-600" /> {candidate?.status === 'Joined' ? 'Locked — Candidate status is Joined' : 'Locked — duplicate profile'}
               </p>
             )}
             <div className="space-y-2">
               {STATUS_OPTIONS.map(s => (
                 <button key={s} onClick={() => handleStatusUpdate(s)}
-                  disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager || (candidate?.status === 'Joined' && s !== 'Joined')}
+                  disabled={isBlockedAsDuplicate || (candidate?.status === 'Joined' && s !== 'Joined')}
                   className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     status === s
                       ? (STATUS_COLORS[s] || 'bg-slate-100 text-slate-600 border-slate-200') + ' border'

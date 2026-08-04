@@ -19,6 +19,7 @@ interface SystemUser {
   loginStartTime?: string;
   loginEndTime?: string;
   allowHomeLogin?: boolean;
+  disableBiometric?: boolean;
 }
 
 const INITIAL_USERS: SystemUser[] = [
@@ -66,11 +67,12 @@ interface AddUserForm {
   loginStartTime?: string;
   loginEndTime?: string;
   allowHomeLogin?: boolean;
+  disableBiometric?: boolean;
 }
 
 const EMPTY_FORM: AddUserForm = {
   name: '', email: '', role: 'recruiter', roles: ['recruiter'], isWFH: false, password: '', pseudoName: '', eid: '',
-  loginStartTime: '09:00', loginEndTime: '18:00', allowHomeLogin: true,
+  loginStartTime: '09:00', loginEndTime: '18:00', allowHomeLogin: true, disableBiometric: false,
 };
 
 // EID Generator - Auto-generates Employee ID based on Full Name and Role
@@ -118,6 +120,7 @@ export function UserManagementPage() {
           loginStartTime: u.loginStartTime || '09:00',
           loginEndTime: u.loginEndTime || '18:00',
           allowHomeLogin: u.allowHomeLogin ?? true,
+          disableBiometric: u.disableBiometric ?? false,
         }));
         setUsers(list);
       } catch (err) {
@@ -177,6 +180,7 @@ const getHighestRole = (roles: Role[]): Role => {
           loginStartTime: form.loginStartTime,
           loginEndTime: form.loginEndTime,
           allowHomeLogin: form.allowHomeLogin,
+          disableBiometric: form.disableBiometric,
         });
         setUsers(prev => prev.map(u => u.id === editUser.id
           ? {
@@ -190,6 +194,7 @@ const getHighestRole = (roles: Role[]): Role => {
               loginStartTime: form.loginStartTime,
               loginEndTime: form.loginEndTime,
               allowHomeLogin: form.allowHomeLogin,
+              disableBiometric: form.disableBiometric,
             }
           : u
         ));
@@ -206,6 +211,7 @@ const getHighestRole = (roles: Role[]): Role => {
           loginStartTime: form.loginStartTime,
           loginEndTime: form.loginEndTime,
           allowHomeLogin: form.allowHomeLogin,
+          disableBiometric: form.disableBiometric,
         });
         const newUser: SystemUser = {
           id: generatedEID || res.employeeId || res.user?.employeeId || res._id || '',
@@ -221,6 +227,7 @@ const getHighestRole = (roles: Role[]): Role => {
           loginStartTime: form.loginStartTime,
           loginEndTime: form.loginEndTime,
           allowHomeLogin: form.allowHomeLogin,
+          disableBiometric: form.disableBiometric,
         };
         setUsers(prev => [...prev, newUser]);
       }
@@ -251,6 +258,7 @@ const getHighestRole = (roles: Role[]): Role => {
       loginStartTime: user.loginStartTime || '09:00',
       loginEndTime: user.loginEndTime || '18:00',
       allowHomeLogin: user.allowHomeLogin ?? true,
+      disableBiometric: user.disableBiometric ?? false,
     });
     setShowModal(true);
   };
@@ -724,6 +732,18 @@ const getHighestRole = (roles: Role[]): Role => {
                 >
                   <option value="allow">Allowed (requires OTP if WFH)</option>
                   <option value="block">Blocked (avoids home/remote login)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1.5" style={{ fontWeight: 600 }}>Biometric Face Attendance</label>
+                <select
+                  value={form.disableBiometric ? 'disabled' : 'enabled'}
+                  onChange={e => setForm(f => ({ ...f, disableBiometric: e.target.value === 'disabled' }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-green-400 bg-white"
+                >
+                  <option value="enabled">Enabled (Requires face scan)</option>
+                  <option value="disabled">Disabled (Bypasses face scan)</option>
                 </select>
               </div>
               {!editUser && (

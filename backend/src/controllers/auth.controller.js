@@ -91,6 +91,7 @@ exports.login = async (req, res, next) => {
         isWFH: loginIsWFH || user.isWFH || false,
         avatar: user.avatar,
         faceDescriptor: user.faceDescriptor,
+        disableBiometric: user.disableBiometric || false,
       },
     });
   } catch (err) {
@@ -212,7 +213,31 @@ exports.verifyOTP = async (req, res, next) => {
         isWFH: user.isWFH || false,
         avatar: user.avatar,
         faceDescriptor: user.faceDescriptor,
+        disableBiometric: user.disableBiometric || false,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/auth/me
+exports.me = async (req, res, next) => {
+  try {
+    const user = req.user;
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        roles: user.roles && user.roles.length > 0 ? user.roles : [user.role],
+        isWFH: user.isWFH || false,
+        avatar: user.avatar,
+        faceDescriptor: user.faceDescriptor,
+        disableBiometric: user.disableBiometric || false,
+        employeeId: user.employeeId,
+      }
     });
   } catch (err) {
     next(err);

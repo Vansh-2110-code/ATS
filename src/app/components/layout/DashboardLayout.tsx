@@ -92,12 +92,20 @@ export function DashboardLayout() {
         setAttMarkedAt(label);
         localStorage.setItem(todayKey(user.id), label);
       } else {
-        // Enforce face scanner immediately on login if not marked
-        setShowCheckInFaceModal(true);
+        // Enforce face scanner immediately on login if not marked (unless biometric disabled)
+        if (!user.disableBiometric) {
+          setShowCheckInFaceModal(true);
+        } else {
+          completeMarkAttendance(user.isWFH || false);
+        }
       }
     }).catch(() => {
-      // Fallback: trigger face scanner if todayStatus cannot be verified
-      setShowCheckInFaceModal(true);
+      // Fallback: trigger face scanner if todayStatus cannot be verified (unless biometric disabled)
+      if (!user.disableBiometric) {
+        setShowCheckInFaceModal(true);
+      } else {
+        completeMarkAttendance(user.isWFH || false);
+      }
     });
   }, [user]);
 
@@ -595,6 +603,7 @@ export function DashboardLayout() {
       {/* ── Face Verification Modal for Check-In ───────────────── */}
       <FaceVerificationModal
         isOpen={showCheckInFaceModal}
+        disableBiometric={user?.disableBiometric}
         onClose={() => {
           setShowCheckInFaceModal(false);
           setPendingWFH(null);

@@ -9,6 +9,7 @@ interface FaceVerificationModalProps {
   actionType: 'checkin' | 'checkout';
   preventCancel?: boolean;
   registeredDescriptor?: number[];
+  disableBiometric?: boolean;
 }
 
 export function FaceVerificationModal({
@@ -17,7 +18,8 @@ export function FaceVerificationModal({
   onSuccess,
   actionType,
   preventCancel,
-  registeredDescriptor
+  registeredDescriptor,
+  disableBiometric
 }: FaceVerificationModalProps) {
   const [step, setStep] = useState<0 | 1 | 2>(0); // 0: Init/Loading, 1: Scanning, 2: Success
   const [progress, setProgress] = useState(0);
@@ -30,6 +32,12 @@ export function FaceVerificationModal({
 
   useEffect(() => {
     if (!isOpen) return;
+
+    if (disableBiometric) {
+      onSuccess([], '');
+      onClose();
+      return;
+    }
 
     // Reset state
     setStep(0);

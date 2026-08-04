@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   loginStartTime: { type: String, default: '09:00' },
   loginEndTime: { type: String, default: '18:00' },
   allowHomeLogin: { type: Boolean, default: true },
+  disableBiometric: { type: Boolean, default: false },
 }, { timestamps: true });
 
 userSchema.index({ role: 1 });

@@ -26,21 +26,37 @@ export function JobsListPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const companyFilter = (location.state as any)?.company as string | undefined;
-
-  const canCreate = ['tl', 'admin', 'manager'].includes(user?.role || '');
-  const canEdit = ['admin', 'manager'].includes(user?.role || '');
-  const canDelete = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
+  const canCreate = ['admin', 'manager', 'tl'].includes(user?.role || '');
+  const canEdit = ['admin', 'manager', 'tl'].includes(user?.role || '');
+  const canDelete = ['admin', 'manager'].includes(user?.role || '');
+  const searchParams = new URLSearchParams(location.search);
+  const urlCompany = searchParams.get('company') || searchParams.get('customer') || (location.state as any)?.company || '';
+  const urlStatus = searchParams.get('status') || '';
+  const urlDivision = searchParams.get('division') || '';
 
   const [jobs, setJobs] = useState<any[]>([]);
   const [companiesList, setCompaniesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [companyQ, setCompanyQ] = useState(companyFilter || '');
+  const [statusFilter, setStatusFilter] = useState(urlStatus);
+  const [companyQ, setCompanyQ] = useState(urlCompany);
+  const [divisionQ, setDivisionQ] = useState(urlDivision);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
   const [stats, setStats] = useState({ open: 0, closed: 0, onHold: 0 });
+
+  // Sync URL search params when navigation changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const c = params.get('company') || params.get('customer') || '';
+    const s = params.get('status') || '';
+    const d = params.get('division') || '';
+
+    if (c) setCompanyQ(c);
+    if (s) setStatusFilter(s);
+    if (d) setDivisionQ(d);
+  }, [location.search]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editJob, setEditJob] = useState<any>(null);
@@ -81,6 +97,7 @@ export function JobsListPage() {
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
       if (companyQ) params.company = companyQ;
+      if (divisionQ) params.division = divisionQ;
       const data = await api.getJobs(params);
       setJobs(data.jobs || []);
       setPagination(data.pagination || { total: 0, pages: 1 });
@@ -89,13 +106,13 @@ export function JobsListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, companyQ, page]);
+  }, [search, statusFilter, companyQ, divisionQ, page]);
 
   useEffect(() => {
     Promise.all([
-      api.getJobs({ status: 'Open', limit: '1' }),
-      api.getJobs({ status: 'Closed', limit: '1' }),
-      api.getJobs({ status: 'On Hold', limit: '1' }),
+      api.getJobs({ status: 'Open', limit: '1', company: companyQ || undefined, division: divisionQ || undefined }),
+      api.getJobs({ status: 'Closed', limit: '1', company: companyQ || undefined, division: divisionQ || undefined }),
+      api.getJobs({ status: 'On Hold', limit: '1', company: companyQ || undefined, division: divisionQ || undefined }),
     ]).then(([open, closed, hold]) => {
       setStats({
         open: open.pagination?.totalPositions || 0,
@@ -103,10 +120,10 @@ export function JobsListPage() {
         onHold: hold.pagination?.totalPositions || 0,
       });
     }).catch(() => {});
-  }, []);
+  }, [companyQ, divisionQ]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
-  useEffect(() => { setPage(1); }, [search, statusFilter, companyQ]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, companyQ, divisionQ]);
   useEffect(() => {
     api.getCompanyList().then((data: any) => {
       const raw = Array.isArray(data) ? data : (data.companies || []);
@@ -228,6 +245,11 @@ export function JobsListPage() {
             <h1 className="text-2xl text-slate-800" style={{ fontWeight: 700 }}>Job Requirements</h1>
             <p className="text-slate-500 text-sm mt-0.5">Manage all JRs across companies</p>
           </div>
+          {canCreate && (
+            <button onClick={openCreate} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors">
+              <Plus className="w-4 h-4" /> Post New JR
+            </button>
+          )}
         </div>
 
         {/* Stats */}
@@ -259,6 +281,13 @@ export function JobsListPage() {
               placeholder="Filter by company…"
               className="pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500/30" />
           </div>
+          <select value={divisionQ} onChange={e => setDivisionQ(e.target.value)}
+            className="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none">
+            <option value="">All Divisions</option>
+            <option value="BPO">BPO Division</option>
+            <option value="IT">IT Division</option>
+            <option value="Lateral">Lateral Division</option>
+          </select>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
             className="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none">
             <option value="">All Status</option>
@@ -266,8 +295,8 @@ export function JobsListPage() {
             <option>Closed</option>
             <option>On Hold</option>
           </select>
-          {(search || statusFilter || companyQ) && (
-            <button onClick={() => { setSearch(''); setStatusFilter(''); setCompanyQ(''); }}
+          {(search || statusFilter || companyQ || divisionQ) && (
+            <button onClick={() => { setSearch(''); setStatusFilter(''); setCompanyQ(''); setDivisionQ(''); }}
               className="flex items-center gap-1 text-sm text-slate-400 hover:text-red-500 px-2 py-2 rounded-xl hover:bg-red-50">
               <X className="w-3.5 h-3.5" /> Clear
             </button>

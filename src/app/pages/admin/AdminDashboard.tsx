@@ -896,13 +896,13 @@ export function AdminDashboard() {
               {/* Summary Metrics */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
                 {[
-                  { label: 'Active JRs', value: divisionData.totalJRs, color: 'text-blue-600', bg: 'bg-blue-50', link: `/admin/jobs?division=${activeDivision}` },
-                  { label: 'Open Positions', value: divisionData.openPositions, color: 'text-indigo-600', bg: 'bg-indigo-50', link: `/admin/jobs?division=${activeDivision}&status=Open` },
-                  { label: 'Screening Round', value: divisionData.pipeline?.screening || 0, color: 'text-amber-600', bg: 'bg-amber-50', link: `/admin/candidates?statusFilter=Screening` },
-                  { label: 'Interview Stage', value: divisionData.pipeline?.interview || 0, color: 'text-violet-600', bg: 'bg-violet-50', link: `/admin/candidates?statusFilter=Interview%20Scheduled` },
-                  { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', link: `/admin/candidates?statusFilter=Selected` },
-                  { label: 'Yet To Join', value: divisionData.pipeline?.yetToJoin || 0, color: 'text-purple-600', bg: 'bg-purple-50', slicerKey: 'yetToJoin', link: `/admin/candidates?statusFilter=Yet%20To%20Join` },
-                  { label: 'Joined Candidates', value: divisionData.pipeline?.joined || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', slicerKey: 'joined', link: `/admin/candidates?statusFilter=Joined` },
+                  { label: 'Active JRs', value: divisionData.totalJRs, color: 'text-blue-600', bg: 'bg-blue-50', link: `/admin/jobs?division=${activeDivision}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&company=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Open Positions', value: divisionData.openPositions, color: 'text-indigo-600', bg: 'bg-indigo-50', link: `/admin/jobs?division=${activeDivision}&status=Open${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&company=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Screening Round', value: divisionData.pipeline?.screening || 0, color: 'text-amber-600', bg: 'bg-amber-50', link: `/admin/candidates?statusFilter=Screening&division=${activeDivision}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Interview Stage', value: divisionData.pipeline?.interview || 0, color: 'text-violet-600', bg: 'bg-violet-50', link: `/admin/candidates?statusFilter=Interview%20Scheduled&division=${activeDivision}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', link: `/admin/candidates?statusFilter=Selected&division=${activeDivision}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Yet To Join', value: divisionData.pipeline?.yetToJoin || 0, color: 'text-purple-600', bg: 'bg-purple-50', slicerKey: 'yetToJoin', link: `/admin/candidates?statusFilter=Yet%20To%20Join&division=${activeDivision}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Joined Candidates', value: divisionData.pipeline?.joined || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', slicerKey: 'joined', link: `/admin/candidates?statusFilter=Joined&division=${activeDivision}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                 ].map((s, i) => (
                   <button
                     key={i}

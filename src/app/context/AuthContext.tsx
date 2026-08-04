@@ -13,6 +13,7 @@ export interface AuthUser {
   isWFH: boolean;
   avatar: string;
   faceDescriptor?: number[];
+  disableBiometric?: boolean;
   employeeId?: string;
 }
 

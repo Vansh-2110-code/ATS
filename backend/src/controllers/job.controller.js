@@ -4,7 +4,7 @@ const { createLog } = require('../utils/auditLogger');
 // GET /api/jobs
 exports.list = async (req, res, next) => {
   try {
-    const { search, status, company, page = 1, limit = 20 } = req.query;
+    const { search, status, company, division, page = 1, limit = 20 } = req.query;
     const query = {};
     if (search) {
       query.$or = [
@@ -14,7 +14,8 @@ exports.list = async (req, res, next) => {
       ];
     }
     if (status) query.status = status;
-    if (company) query.companyName = { $regex: company, $options: 'i' };
+    if (company) query.companyName = { $regex: company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), $options: 'i' };
+    if (division) query.division = division;
 
     // Hide Closed priority jobs from non-admin users
     if (req.user && req.user.role !== 'admin') {
