@@ -8,6 +8,28 @@ const ExcelJS = require('exceljs');
 const notificationService = require('../utils/notification.service');
 const validator = require('validator');
 
+// GET /api/candidates/callbacks
+exports.getCallbacks = async (req, res, next) => {
+  try {
+    const query = {
+      $or: [
+        { status: 'Call Back' },
+        { callBackDate: { $ne: null } },
+        { interviewCallBackDate: { $ne: null } }
+      ]
+    };
+
+    if (req.user && req.user.role === 'recruiter') {
+      query.assignedRecruiter = req.user._id;
+    }
+
+    const candidates = await Candidate.find(query).sort({ updatedAt: -1 }).limit(100);
+    res.json({ success: true, count: candidates.length, candidates });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/candidates/clients — created company names for filter dropdowns
 exports.listClientNames = async (req, res, next) => {
   try {
@@ -24,10 +46,8 @@ exports.listClientNames = async (req, res, next) => {
 // GET /api/candidates
 exports.list = async (req, res, next) => {
   try {
-    const { search, source, status, city, localArea, recruiter, page = 1, limit = 20, sort = '-createdAt', fromDate, toDate } = req.query;
+    const { search, source, status, city, localArea, recruiter, page = 1, limit = 20, sort = '-createdAt', fromDate, toDate, division, statusIn, activeOnly, createdToday, company, clientName, tlId } = req.query;
     const query = {};
-
-
 
     if (search) {
       query.$or = [
@@ -41,7 +61,54 @@ exports.list = async (req, res, next) => {
       ];
     }
     if (source) query.source = source;
-    if (status) query.status = status;
+
+    // Company / Client filtering
+    const companyParam = company || clientName;
+    if (companyParam && companyParam !== 'All Companies') {
+      const companyRegex = new RegExp(`^${companyParam.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      query.$or = [
+        { clientName: companyRegex },
+        { company: companyRegex },
+        { client: companyRegex },
+      ];
+    }
+
+    // statusIn: comma-separated list of statuses e.g. "Eligible,Eligible Candidates"
+    if (statusIn) {
+      const statuses = statusIn.split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length > 0) query.status = { $in: statuses };
+    } else if (status) {
+      if (status === 'Eligible Candidates' || status === 'Eligible') {
+        query.status = { $in: ['Eligible', 'Eligible Candidates'] };
+      } else if (status === 'Documentation' || status === 'Document Pending') {
+        query.status = { $in: ['Documentation', 'Document Pending', 'Documentation Completed', 'Documentation Incomplete', 'Documennt Initialted', 'Document Initialized'] };
+      } else {
+        query.status = status;
+      }
+    }
+
+    // activeOnly: show candidates not in terminal/rejected statuses
+    if (activeOnly === 'true') {
+      const terminalStatuses = [
+        'Not Eligible', 'Not Interested', 'Duplicate-Client', 'Black List',
+        'VNA Reject', 'Test Reject', 'L1 Reject', 'L2 Reject', 'Final Reject',
+        'Offer Reject', 'Joined and Abort', 'No Show',
+        'Candidate Drop Post L1 Select', 'Candidate Drop Post L2 Select',
+        'Candidate Drop During Final Stage',
+      ];
+      query.status = { $nin: terminalStatuses };
+    }
+
+    // createdToday: only candidates created today
+    if (createdToday === 'true') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      query.createdAt = { $gte: today, $lt: tomorrow };
+    }
+
+    if (division && division !== 'All') query.division = division;
     if (city) query.city = { $regex: city, $options: 'i' };
     if (localArea) query.localArea = { $regex: localArea, $options: 'i' };
     if (req.query.reassignRequested === 'true') query.reassignRequested = true;
@@ -51,15 +118,58 @@ exports.list = async (req, res, next) => {
       query.tlCallSubmitted = false;
     }
 
-    if (fromDate || toDate) {
-      query.createdAt = {};
-      if (fromDate) {
-        query.createdAt.$gte = new Date(fromDate);
+    if (fromDate || toDate || req.query.range || req.query.dateRange) {
+      const selectedRange = (req.query.range || req.query.dateRange || '').toLowerCase();
+      if (selectedRange && selectedRange !== 'all') {
+        const { getDateRange } = require('../utils/helpers');
+        const { start, end } = getDateRange(selectedRange, fromDate, toDate);
+        query.createdAt = { $gte: start, $lt: end };
+      } else {
+        if (!query.createdAt) query.createdAt = {};
+        if (fromDate) {
+          query.createdAt.$gte = new Date(fromDate);
+        }
+        if (toDate) {
+          const endOfDay = new Date(toDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          query.createdAt.$lte = endOfDay;
+        }
       }
-      if (toDate) {
-        const endOfDay = new Date(toDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = endOfDay;
+    }
+
+    // Team Leader Filter (resolve TL team members)
+    if (tlId && tlId !== 'All Team Leaders' && !recruiter) {
+      const TeamMember = require('../models/TeamMember');
+      const User = require('../models/User');
+      const mongoose = require('mongoose');
+
+      const tlUser = await User.findOne({
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(tlId) ? tlId : null },
+          { name: tlId }
+        ]
+      }).select('_id name');
+      const targetTlId = tlUser ? tlUser._id : tlId;
+      const targetTlName = tlUser ? tlUser.name : tlId;
+
+      const teamAssigned = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null }).lean();
+      const memberIds = teamAssigned.map(m => m.memberId).filter(Boolean);
+      const userIds = [targetTlId, ...memberIds];
+
+      const memberUsers = await User.find({ _id: { $in: userIds } }).select('_id name');
+      const userNames = memberUsers.map(u => u.name).filter(Boolean);
+      if (targetTlName && !userNames.includes(targetTlName)) userNames.push(targetTlName);
+
+      const tlUserCond = [
+        { assignedRecruiter: { $in: userIds } },
+        { assignedRecruiterName: { $in: userNames } }
+      ];
+
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: tlUserCond }];
+        delete query.$or;
+      } else {
+        query.$or = tlUserCond;
       }
     }
 
@@ -158,29 +268,22 @@ exports.list = async (req, res, next) => {
       'Rejected – Interview Round', 'Rejected – Second Round'
     ];
 
-    // Auto-transfer condition: Move rejected / not selected candidates > 30 days to General Data
+    // Item 7: Move candidates > 30 days cooling period to General Data and untag from specific recruiter
     await Candidate.updateMany(
       {
-        ownershipStatus: { $in: ['Assigned', 'Expired'] },
-        assignedAt: { $lt: thirtyDaysAgo },
+        ownershipStatus: { $ne: 'General Data' },
         $or: [
-          { status: { $in: rejectedOrNotSelected } },
-          { firstCallStatus: { $in: rejectedOrNotSelected } },
-          { interviewStatus: { $in: rejectedOrNotSelected } },
-          { finalInterviewStatus: 'Rejected' },
-          { postOfferStatus: { $in: ['Background Verification Failed', 'Offer Declined'] } }
+          { assignedAt: { $lt: thirtyDaysAgo } },
+          { createdAt: { $lt: thirtyDaysAgo } },
         ]
       },
-      { $set: { ownershipStatus: 'General Data' } }
-    );
-
-    // Keep existing 30-day privacy unchanged: other non-rejected > 30 days become Expired (visible only to original recruiter, but pickable by others)
-    await Candidate.updateMany(
-      {
-        ownershipStatus: 'Assigned',
-        assignedAt: { $lt: thirtyDaysAgo }
-      },
-      { $set: { ownershipStatus: 'Expired' } }
+      { 
+        $set: { 
+          ownershipStatus: 'General Data',
+          assignedRecruiter: null,
+          assignedRecruiterName: 'General Pool'
+        } 
+      }
     );
 
     const [candidates, total] = await Promise.all([
@@ -220,8 +323,10 @@ exports.getById = async (req, res, next) => {
     const daysSinceAssignment = Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24));
     const isExpired = daysSinceAssignment >= 30 || candidate.ownershipStatus === 'Expired';
 
-    if (daysSinceAssignment >= 30 && candidate.ownershipStatus === 'Assigned') {
-      candidate.ownershipStatus = 'Expired';
+    if (daysSinceAssignment >= 30 && candidate.ownershipStatus !== 'General Data') {
+      candidate.ownershipStatus = 'General Data';
+      candidate.assignedRecruiter = undefined;
+      candidate.assignedRecruiterName = 'General Pool';
       await candidate.save();
     }
 
@@ -1094,6 +1199,16 @@ exports.reassign = async (req, res, next) => {
 
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
+
+    // Item 3: If TL, can reassign candidates with status "Not Eligible", "Client Duplicate", "No Response", "Hold"
+    if (req.user.role === 'tl') {
+      const allowedStatuses = ['Not Eligible', 'Client Duplicate', 'Duplicate-Client', 'No Response', 'Hold'];
+      if (!allowedStatuses.includes(candidate.status)) {
+        return res.status(403).json({
+          message: `Team Leads can only reassign candidates with status "Not Eligible", "Client Duplicate", "No Response", or "Hold". Current candidate status is "${candidate.status}".`
+        });
+      }
+    }
 
     // Preserve history before reset
     candidate.stageHistory.push({

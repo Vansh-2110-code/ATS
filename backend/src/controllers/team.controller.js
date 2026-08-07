@@ -12,9 +12,9 @@ exports.getTeamMembers = async (req, res) => {
 
     let formattedMembers = [];
 
-    if (tlUser.role === 'admin' && !tlId) {
-      // Admin preview mode: show all recruiters
-      const allRecruiters = await User.find({ role: 'recruiter' }).lean().exec();
+    if (tlUser.role === 'admin' && (!tlId || tlId === 'all')) {
+      // Admin preview mode: show all active recruiters
+      const allRecruiters = await User.find({ role: 'recruiter', status: { $ne: 'Suspended' } }).lean().exec();
       formattedMembers = allRecruiters.map(r => ({
         _id: r._id,
         name: r.name,
@@ -23,18 +23,20 @@ exports.getTeamMembers = async (req, res) => {
         role: r.role,
       }));
     } else {
-      const members = await TeamMember.find({ teamLeaderId: targetTlId })
-        .populate('memberId', 'name email employeeId role')
+      const members = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null })
+        .populate('memberId', 'name email employeeId role status')
         .lean()
         .exec();
 
-      formattedMembers = members.map(m => ({
-        _id: m.memberId._id,
-        name: m.memberId.name,
-        email: m.memberId.email,
-        employeeId: m.memberId.employeeId,
-        role: m.memberId.role,
-      }));
+      formattedMembers = members
+        .filter(m => m && m.memberId && m.memberId.status !== 'Suspended')
+        .map(m => ({
+          _id: m.memberId._id || m.memberId,
+          name: m.memberId.name || 'Recruiter',
+          email: m.memberId.email || '',
+          employeeId: m.memberId.employeeId || '',
+          role: m.memberId.role || 'recruiter',
+        }));
     }
 
     res.json({ success: true, members: formattedMembers });
@@ -55,7 +57,7 @@ exports.addTeamMember = async (req, res) => {
     const targetTlId = (currentUser.role === 'admin' || currentUser.role === 'manager') && tlId ? tlId : currentUser._id;
 
     // Find the recruiter by _id or employeeId
-    let recruiterQuery = { role: 'recruiter' };
+    let recruiterQuery = { role: 'recruiter', status: { $ne: 'Suspended' } };
     if (mongoose.Types.ObjectId.isValid(employeeId)) {
       recruiterQuery._id = employeeId;
     } else {
@@ -64,7 +66,7 @@ exports.addTeamMember = async (req, res) => {
 
     const recruiter = await User.findOne(recruiterQuery);
     if (!recruiter) {
-      return res.status(404).json({ message: 'Recruiter not found' });
+      return res.status(404).json({ message: 'Recruiter not found or is suspended' });
     }
 
     // Check if already assigned to ANY team leader
@@ -131,7 +133,7 @@ exports.removeTeamMember = async (req, res) => {
 // ─── Get Team Leaders (for Admin/Manager) ──────────────────────
 exports.getTeamLeaders = async (req, res) => {
   try {
-    const leaders = await User.find({ role: 'tl' })
+    const leaders = await User.find({ role: 'tl', status: { $ne: 'Suspended' } })
       .select('name email employeeId role _id')
       .lean()
       .exec();
@@ -149,7 +151,7 @@ exports.addTeamLeader = async (req, res) => {
     const { employeeId } = req.body;
     const mongoose = require('mongoose');
 
-    let query = {};
+    let query = { status: { $ne: 'Suspended' } };
     if (mongoose.Types.ObjectId.isValid(employeeId)) {
       query._id = employeeId;
     } else {
@@ -158,7 +160,7 @@ exports.addTeamLeader = async (req, res) => {
 
     const user = await User.findOne(query);
     if (!user) {
-      return res.status(404).json({ message: 'Employee not found' });
+      return res.status(404).json({ message: 'Employee not found or is suspended' });
     }
 
     // Check if already TL
@@ -220,15 +222,15 @@ exports.getAvailableEmployees = async (req, res) => {
   try {
     const { role } = req.query;
 
-    let query = {};
+    let query = { status: { $ne: 'Suspended' } };
     if (role === 'recruiter') {
-      query = { role: 'recruiter' };
+      query.role = 'recruiter';
     } else if (role === 'tl') {
-      query = { role: { $in: ['recruiter'] } };
+      query.role = { $in: ['recruiter'] };
     }
 
     const employees = await User.find(query)
-      .select('name email employeeId role _id')
+      .select('name email employeeId role status _id')
       .lean()
       .exec();
 
@@ -260,3 +262,4 @@ exports.getAvailableEmployees = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+

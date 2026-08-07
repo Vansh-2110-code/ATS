@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   // Team Lead
   { label: 'Overview',         href: '/tl',                      icon: LayoutDashboard, roles: ['tl'], category: 'Team Lead' },
   { label: 'My Team',          href: '/tl/my-team',              icon: Users,           roles: ['tl'], category: 'Team Lead' },
-  { label: 'Eligible Candidates', href: '/tl/follow-ups',        icon: ClipboardCheck,  roles: ['tl', 'manager', 'admin'], category: 'Team Lead' },
+  { label: 'Candidate Management', href: '/recruiter/resumes',   icon: Users,           roles: ['tl', 'manager', 'admin'], category: 'Team Lead' },
   { label: 'Job Requirements', href: '/admin/jobs',              icon: Briefcase,        roles: ['tl'], category: 'Team Lead' },
   { label: 'Create Job (JR)',  href: '/recruiter/jobs/new',      icon: FileText,         roles: ['tl', 'manager'], category: 'Team Lead' },
   { label: 'Bulk Job Post',    href: '/recruiter/jobs/bulk',     icon: LayoutGrid,       roles: ['tl', 'manager'], category: 'Team Lead' },

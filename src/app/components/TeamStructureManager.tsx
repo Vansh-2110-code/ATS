@@ -35,6 +35,7 @@ export function TeamStructureManager() {
 
   const loadLeaders = async () => {
     setLoadingLeaders(true);
+    setError('');
     try {
       const data = await api.getTeamLeaders();
       setLeaders(data.leaders || []);
@@ -47,6 +48,7 @@ export function TeamStructureManager() {
 
   const loadTeamMembers = async (leaderId: string) => {
     setLoadingMembers(true);
+    setError('');
     try {
       const data = await api.getTeamMembers(leaderId);
       setTeamMembers(data.members || []);
@@ -67,7 +69,8 @@ export function TeamStructureManager() {
     setSelectedNewLeaderId('');
     try {
       const data = await api.getAvailableEmployees('tl');
-      setAvailableEmployees(data.employees || []);
+      const list = (data.employees || []).filter((e: any) => e.status !== 'Suspended' && e.status !== 'Inactive');
+      setAvailableEmployees(list);
     } catch (err) {
       setError('Failed to load available employees for TL');
     }
@@ -78,7 +81,8 @@ export function TeamStructureManager() {
     setSelectedNewMemberId('');
     try {
       const data = await api.getAvailableEmployees('recruiter');
-      setAvailableRecruiters(data.employees || []);
+      const list = (data.employees || []).filter((e: any) => e.status !== 'Suspended' && e.status !== 'Inactive');
+      setAvailableRecruiters(list);
     } catch (err) {
       setError('Failed to load available recruiters');
     }

@@ -150,75 +150,7 @@ export function TLCandidateViewModal({ candidate, onClose, onSaved }: Props) {
             </div>
           </div>
 
-          {/* ── READ-ONLY: First Call Status ── */}
-          <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
-              <Phone className="w-4 h-4 text-amber-400" />
-              <span className="text-amber-700 text-sm" style={{ fontWeight: 600 }}>First Call Status</span>
-              <span className="ml-auto text-xs text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> Read-only</span>
-            </div>
-            <div className="px-5 py-4 grid sm:grid-cols-3 gap-4">
-              <ROField label="First Call Status" value={candidate.firstCallStatus} />
-              <ROField label="Communication Rating" value={candidate.communicationRating} />
-              <ROField label="Interview Type" value={candidate.firstCallInterviewType || candidate.interviewType} />
-              <ROField label="Eligible Role" value={candidate.eligibleRole} />
-              <ROField label="First Call Date" value={candidate.firstCallDate ? new Date(candidate.firstCallDate).toLocaleDateString() : ''} />
-              <ROField label="Comments" value={candidate.comments} />
-            </div>
-          </div>
-
-          {/* ── READ-ONLY: Candidate Final Details ── */}
-          <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-3 bg-green-50 border-b border-green-100 flex items-center gap-2">
-              <Award className="w-4 h-4 text-green-500" />
-              <span className="text-green-700 text-sm" style={{ fontWeight: 600 }}>Candidate Final Details</span>
-              <span className="ml-auto text-xs text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> Read-only</span>
-            </div>
-            <div className="px-5 py-4 grid sm:grid-cols-3 gap-4">
-              <ROField label="Candidate Age" value={candidate.candidateAge} />
-              <ROField label="Recruiter Status" value={candidate.recruiterStatus} />
-              <ROField label="Walk-in Schedule" value={candidate.walkInSchedule ? new Date(candidate.walkInSchedule).toLocaleString() : ''} />
-              <ROField label="Tentative DOJ" value={candidate.tentativeDOJ ? new Date(candidate.tentativeDOJ).toLocaleDateString() : ''} />
-            </div>
-          </div>
-
-          {/* ── EDITABLE: Interview Status ── */}
-          <div className="bg-white rounded-xl border-2 border-violet-300 overflow-hidden shadow-sm">
-            <div className="px-5 py-3 bg-violet-50 border-b border-violet-200 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-violet-600" />
-              <span className="text-violet-800 text-sm" style={{ fontWeight: 700 }}>Interview Status</span>
-              <span className="ml-auto text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full" style={{ fontWeight: 600 }}>
-                ✏️ Editable by Team Leader
-              </span>
-            </div>
-            <div className="px-5 py-5 space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1.5" style={{ fontWeight: 500 }}>Interview Status</label>
-                  <select
-                    value={interviewStatus}
-                    onChange={e => setInterviewStatus(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-violet-400 bg-white"
-                  >
-                    <option value="">Select status</option>
-                    {INTERVIEW_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-700 mb-1.5 flex items-center gap-1" style={{ fontWeight: 500 }}>
-                    <Shield className="w-3.5 h-3.5 text-violet-500" />
-                    Final Round Status
-                  </label>
-                  <select
-                    value={finalInterviewSlotStatus}
-                    onChange={e => setFinalInterviewSlotStatus(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-violet-200 text-sm outline-none focus:border-violet-400 bg-white"
-                  >
-                    <option value="">Select</option>
-                    <option value="Final Round Scheduled">Final Round Scheduled</option>
-                  </select>
-                </div>
-              </div>
+          {/* ── EDITABLE: Offer & Joining Details ── */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-slate-700 mb-1.5" style={{ fontWeight: 500 }}>Scheduled Date</label>
@@ -319,8 +251,6 @@ export function TLCandidateViewModal({ candidate, onClose, onSaved }: Props) {
                   {['Selected', 'Rejected', 'On Hold'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-            </div>
-          </div>
 
           {/* Error / Success */}
           {error && (

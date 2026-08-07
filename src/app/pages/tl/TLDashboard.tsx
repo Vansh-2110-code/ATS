@@ -3,18 +3,31 @@ import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import {
   Phone, Calendar, AlertCircle, TrendingUp, ArrowRight, Users, Edit3, Loader2, Mail,
-  X, Eye, BarChart3, Zap, Target, Award, CheckCircle2
+  X, Eye, BarChart3, Zap, Target, Award, CheckCircle2, FileText,
+  PhoneOff, PhoneMissed, PhoneCall, ClipboardList, UserX, Building2,
+  BadgeCheck, Clipboard, UserPlus, Clock, Briefcase, UserCheck
 } from 'lucide-react';
 import api from '../../services/api';
 import { getGreeting } from '../../utils/greetingUtils';
 import { TLCandidateViewModal } from './TLCandidateViewModal';
 import { TeamPerformanceReviews } from '../../components/TeamPerformanceReviews';
 
+import { CANDIDATE_STATUS_OPTIONS } from '../../utils/candidateStatusUtils';
+import { SlicerFilteredDataView } from '../../components/SlicerFilteredDataView';
+import { dedupeCompanies } from '../../utils/companyUtils';
+
+type DateRange = 'Day' | 'Week' | 'Month' | 'Quarter' | 'Year' | 'All' | 'Custom';
+
 interface TeamMember {
   id: string;
   name: string;
   calls: number;
   totalCalls: number;
+  eligible: number;
+  finalSelect: number;
+  docCompleted: number;
+  offerAccept: number;
+  joined: number;
   target: number;
   interviews: number;
   totalInterviewsScheduled: number;
@@ -22,24 +35,80 @@ interface TeamMember {
   totalCandidates: number;
   activeCandidates: number;
   status: string;
-  joined: string;
+  joinedDate: string;
 }
 
+const STATUS_ICON_MAP: Record<string, any> = {
+  'Eligible Candidates': UserCheck,
+  'Wrong Number': PhoneOff,
+  'Did Not Pick': PhoneMissed,
+  'Call Back': PhoneCall,
+  'HR Shortlist': ClipboardList,
+  'Written Test': FileText,
+  'Operations Round': Building2,
+  'Selected': BadgeCheck,
+  'Documentation': Clipboard,
+  'Yet To Join': UserX,
+  'Joined': CheckCircle2,
+  'New': UserPlus,
+  'Contacted': Phone,
+  'Interested': CheckCircle2,
+  'Interview Scheduled': Calendar,
+  'Rejected': X,
+};
 
+const STATUS_COLOR_LIST = ['emerald','red','orange','amber','violet','indigo','cyan','teal','sky','pink','green'];
 
-const STATUS_COLORS: Record<string, { dot: string; badge: string }> = {
-  online: { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
-  'on-target': { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
-  break: { dot: 'bg-amber-500', badge: 'bg-amber-100 text-amber-700' },
-  offline: { dot: 'bg-slate-300', badge: 'bg-slate-100 text-slate-500' },
+const STATUS_COLOR_MAP: Record<string, { card: string; icon: string; badge: string }> = {
+  emerald: { card: 'border-emerald-100 bg-emerald-50/60 hover:bg-emerald-50',     icon: 'bg-emerald-100 text-emerald-600', badge: 'text-emerald-700' },
+  red:     { card: 'border-red-100     bg-red-50/60     hover:bg-red-50',          icon: 'bg-red-100     text-red-500',     badge: 'text-red-600' },
+  orange:  { card: 'border-orange-100  bg-orange-50/60  hover:bg-orange-50',       icon: 'bg-orange-100  text-orange-600',  badge: 'text-orange-700' },
+  amber:   { card: 'border-amber-100   bg-amber-50/60   hover:bg-amber-50',        icon: 'bg-amber-100   text-amber-600',   badge: 'text-amber-700' },
+  violet:  { card: 'border-violet-100  bg-violet-50/60  hover:bg-violet-50',       icon: 'bg-violet-100  text-violet-600',  badge: 'text-violet-700' },
+  indigo:  { card: 'border-indigo-100  bg-indigo-50/60  hover:bg-indigo-50',       icon: 'bg-indigo-100  text-indigo-600',  badge: 'text-indigo-700' },
+  cyan:    { card: 'border-cyan-100    bg-cyan-50/60    hover:bg-cyan-50',         icon: 'bg-cyan-100    text-cyan-600',    badge: 'text-cyan-700' },
+  teal:    { card: 'border-teal-100    bg-teal-50/60    hover:bg-teal-50',         icon: 'bg-teal-100    text-teal-600',    badge: 'text-teal-700' },
+  sky:     { card: 'border-sky-100     bg-sky-50/60     hover:bg-sky-50',          icon: 'bg-sky-100     text-sky-600',     badge: 'text-sky-700' },
+  pink:    { card: 'border-pink-100    bg-pink-50/60    hover:bg-pink-50',         icon: 'bg-pink-100    text-pink-600',    badge: 'text-pink-700' },
+  green:   { card: 'border-green-100   bg-green-50/60   hover:bg-green-50',        icon: 'bg-green-100   text-green-600',   badge: 'text-green-700' },
+};
+
+const topColorMap: Record<string, { card: string; icon: string; badge: string; text: string }> = {
+  blue:    { card: 'border-blue-100   bg-blue-50/40',     icon: 'bg-blue-100   text-blue-600',    badge: 'bg-blue-100   text-blue-700',   text: 'text-blue-600' },
+  amber:   { card: 'border-amber-100  bg-amber-50/40',    icon: 'bg-amber-100  text-amber-600',   badge: 'bg-amber-100  text-amber-700',  text: 'text-amber-600' },
+  violet:  { card: 'border-violet-100 bg-violet-50/40',   icon: 'bg-violet-100 text-violet-600',  badge: 'bg-violet-100 text-violet-700', text: 'text-violet-600' },
+  emerald: { card: 'border-emerald-100 bg-emerald-50/40', icon: 'bg-emerald-100 text-emerald-600', badge: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-600' },
+  cyan:    { card: 'border-cyan-100    bg-cyan-50/40',    icon: 'bg-cyan-100    text-cyan-600',    badge: 'bg-cyan-100    text-cyan-700',    text: 'text-cyan-600' },
 };
 
 export function TLDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [summary, setSummary] = useState({
+    totalCalls: 0,
+    eligible: 0,
+    finalSelect: 0,
+    docCompleted: 0,
+    offerAccept: 0,
+    joined: 0,
+  });
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Recruiter Dashboard Slicer & Filter State
+  const [dateRange, setDateRange] = useState<DateRange>('Month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [division, setDivision] = useState('BPO');
+  const [company, setCompany] = useState('');
+  const [customer, setCustomer] = useState('');
+  const [recruiter, setRecruiter] = useState('');
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [dashData, setDashData] = useState<any>(null);
+  const [activeSlicer, setActiveSlicer] = useState<string>('All');
 
   // Recruiter detail view state
   const [selectedRecruiter, setSelectedRecruiter] = useState<TeamMember | null>(null);
@@ -47,19 +116,51 @@ export function TLDashboard() {
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [tlCandidate, setTlCandidate] = useState<any>(null);
 
+  const DATE_TABS: DateRange[] = ['Day', 'Week', 'Quarter', 'Year', 'All', 'Custom'];
+
+  // Load Companies & Recruiters list
+  useEffect(() => {
+    Promise.all([
+      (api as any).getCompanyList ? (api as any).getCompanyList() : Promise.resolve([]),
+      (api as any).getRecruiters ? (api as any).getRecruiters() : Promise.resolve([]),
+    ]).then(([compData, recData]: any) => {
+      const rawComps = Array.isArray(compData) ? compData : (compData?.companies || []);
+      const rawRecs = Array.isArray(recData) ? recData : (recData?.users || recData?.recruiters || []);
+      setCompanies(dedupeCompanies(rawComps));
+      setRecruiters(rawRecs);
+    }).catch(console.error);
+  }, []);
+
+  // Load TL Dashboard & Recruiter Dashboard Metrics
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const [dashData, tasksData] = await Promise.all([
-          api.getTLDashboard(),
+        const params: Record<string, string> = { range: dateRange.toLowerCase() };
+        if (dateRange === 'Custom' && customFrom) params.from = customFrom;
+        if (dateRange === 'Custom' && customTo) params.to = customTo;
+        if (division) params.division = division;
+        if (company) params.company = company;
+        if (customer) params.customer = customer;
+        if (recruiter) params.recruiter = recruiter;
+
+        const [tlData, rDashData, tasksData] = await Promise.all([
+          api.getTLDashboard({ range: dateRange.toLowerCase() }),
+          api.getRecruiterDashboard(params).catch(() => null),
           api.getTasks({ status: 'Pending,In Progress' }).catch(() => ({ tasks: [] })),
         ]);
-        const t = dashData.teamMembers || dashData.team || dashData.recruiters || [];
+
+        const t = tlData.teamMembers || tlData.team || tlData.recruiters || [];
         setTeam(t.map((r: any) => ({
           id: r._id || r.id,
           name: r.name || '',
           calls: r.calls ?? r.todayCalls ?? 0,
+          totalCalls: r.totalCalls ?? 0,
+          eligible: r.eligible ?? 0,
+          finalSelect: r.finalSelect ?? 0,
+          docCompleted: r.docCompleted ?? 0,
+          offerAccept: r.offerAccept ?? 0,
+          joined: r.joined ?? 0,
           target: r.target ?? r.callTarget ?? r.dailyTarget ?? 50,
           interviews: r.interviews ?? r.todayInterviews ?? r.interviewsScheduled ?? 0,
           totalInterviewsScheduled: r.totalInterviewsScheduled ?? 0,
@@ -67,8 +168,16 @@ export function TLDashboard() {
           totalCandidates: r.totalCandidates ?? 0,
           activeCandidates: r.activeCandidates ?? 0,
           status: r.onTarget ? 'on-target' : (r.status || 'offline'),
-          joined: r.joined || r.loginTime || '—',
+          joinedDate: r.joined || r.loginTime || '—',
         })));
+
+        if (tlData.summary) {
+          setSummary(tlData.summary);
+        }
+
+        if (rDashData) {
+          setDashData(rDashData);
+        }
 
         setTasks(tasksData.tasks || []);
       } catch (err) {
@@ -78,7 +187,7 @@ export function TLDashboard() {
       }
     };
     load();
-  }, []);
+  }, [dateRange, customFrom, customTo, division, company, customer, recruiter]);
 
   // Load candidates for selected recruiter
   const loadRecruiterCandidates = async (recruiterId: string) => {
@@ -95,21 +204,30 @@ export function TLDashboard() {
   };
 
   // Open recruiter detail
-  const openRecruiterDetail = async (recruiter: TeamMember) => {
-    setSelectedRecruiter(recruiter);
-    await loadRecruiterCandidates(recruiter.id);
+  const openRecruiterDetail = (recruiterMember: TeamMember) => {
+    setSelectedRecruiter(recruiterMember);
+    loadRecruiterCandidates(recruiterMember.id);
   };
 
-  // Open TL candidate view Modal
+  // Open TL Candidate View Modal
   const openTLCandidateView = (cand: any) => {
     setTlCandidate(cand);
   };
 
-  const totalCallsDone = team.reduce((s, r) => s + (r.totalCalls || r.calls), 0);
-  const totalInterviews = team.reduce((s, r) => s + (r.totalInterviewsScheduled || r.interviews), 0);
-  const totalFollowUps = team.reduce((s, r) => s + r.followUps, 0);
-  const totalActiveCandidates = team.reduce((s, r) => s + r.activeCandidates, 0);
-  const totalCandidatesCount = team.reduce((s, r) => s + r.totalCandidates, 0);
+  // Metric aggregates for TL Overview
+  const totalCallsDone = summary.totalCalls || team.reduce((s, r) => s + r.totalCalls, 0);
+  const totalEligible = summary.eligible || team.reduce((s, r) => s + r.eligible, 0);
+  const totalFinalSelect = summary.finalSelect || team.reduce((s, r) => s + r.finalSelect, 0);
+  const totalDocCompleted = summary.docCompleted || team.reduce((s, r) => s + r.docCompleted, 0);
+  const totalOfferAccept = summary.offerAccept || team.reduce((s, r) => s + r.offerAccept, 0);
+  const totalJoined = summary.joined || team.reduce((s, r) => s + r.joined, 0);
+
+  const STATUS_CARDS = CANDIDATE_STATUS_OPTIONS.map((label, i) => ({
+    label,
+    count: dashData?.pipeline?.[label] || 0,
+    color: STATUS_COLOR_LIST[i % STATUS_COLOR_LIST.length],
+    icon: STATUS_ICON_MAP[label] || UserCheck,
+  }));
 
   if (loading) {
     return (
@@ -120,138 +238,266 @@ export function TLDashboard() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-slate-800" style={{ fontWeight: 700, fontSize: '1.5rem' }}>Team Overview</h1>
-        <p className="text-slate-500 text-sm mt-0.5">{getGreeting()}, {user?.name.split(' ')[0]}! Here's your team's performance today.</p>
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+        <div>
+          <h1 className="text-slate-800 flex items-center gap-2" style={{ fontWeight: 800, fontSize: '1.5rem' }}>
+            {getGreeting()}, {user?.name?.split(' ')[0] || 'Team Lead'}! 👋
+          </h1>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Team Overview & Recruiter Performance Tracking ({todayStr})
+          </p>
+        </div>
       </div>
 
-      {/* Team Summary Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {[
-          { label: 'Total Calls Done', value: totalCallsDone, icon: Phone, color: 'blue', href: '/recruiter/resumes' },
-          { label: 'Interviews Scheduled', value: totalInterviews, icon: Calendar, color: 'violet', href: '/recruiter/interviews' },
-          { label: 'Pending Follow-Ups', value: totalFollowUps, icon: AlertCircle, color: 'amber', href: '/tl/follow-ups' },
-
-          { label: 'Active Recruiters', value: `${team.filter(r => r.calls > 0).length}/${team.length}`, icon: Users, color: 'emerald', href: '' },
-          { label: 'Active Candidates', value: totalActiveCandidates, icon: Users, color: 'blue', href: '' },
-          { label: 'Total Candidates', value: totalCandidatesCount, icon: Users, color: 'violet', href: '' },
-        ].map((m, i) => {
-          const Icon = m.icon;
-          const colors: Record<string, string> = {
-            blue: 'bg-blue-50 text-blue-600',
-            violet: 'bg-violet-50 text-violet-600',
-            amber: 'bg-amber-50 text-amber-600',
-            emerald: 'bg-emerald-50 text-emerald-600',
-            red: 'bg-red-50 text-red-600',
-          };
-          const card = (
-            <>
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${colors[m.color]}`}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <div className="text-slate-800 mb-0.5" style={{ fontWeight: 700, fontSize: '1.75rem' }}>{m.value}</div>
-              <div className="text-slate-500 text-sm">{m.label}</div>
-            </>
-          );
-          return m.href ? (
-            <button key={i} onClick={() => navigate(m.href)}
-              className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 transition-all w-full">
-              {card}
-            </button>
-          ) : (
-            <div key={i} className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">{card}</div>
-          );
-        })}
+      {/* ── Division Tabs ── */}
+      <div className="flex gap-2 border-b border-slate-200">
+        {['IT', 'BPO', 'Lateral'].map(div => (
+          <button
+            key={div}
+            onClick={() => setDivision(div)}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${division === div ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            {div}
+          </button>
+        ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Recruiter Performance Cards */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Recruiter Performance — Today</h2>
+      {/* ── Date & Filter Bar ── */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-xs px-4 py-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-400 mr-1" style={{ fontWeight: 600 }}>FILTER BY:</span>
+          <div className="flex gap-1 flex-wrap">
+            {DATE_TABS.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setDateRange(tab)}
+                className={`px-4 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                  dateRange === tab
+                    ? 'bg-green-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+                style={{ fontWeight: dateRange === tab ? 600 : 500 }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-          {team.length === 0 && (
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 text-center text-slate-400 text-sm">
-              No active recruiters found.
+
+          {dateRange === 'Custom' && (
+            <div className="flex items-center gap-2 ml-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-400">From</span>
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={e => setCustomFrom(e.target.value)}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-400">To</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={e => setCustomTo(e.target.value)}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white"
+                />
+              </div>
+              {(customFrom || customTo) && (
+                <button
+                  onClick={() => { setCustomFrom(''); setCustomTo(''); }}
+                  className="p-1.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           )}
-          {team.map(r => {
-            const pct = Math.min(100, Math.round((r.calls / (r.target || 50)) * 100));
-            const sc = STATUS_COLORS[r.status] || STATUS_COLORS.offline;
+
+          <div className="flex items-center gap-2 flex-wrap ml-auto">
+            <select
+              value={company}
+              onChange={e => setCompany(e.target.value)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white"
+            >
+              <option value="">All Companies</option>
+              {companies.map(c => <option key={c._id || c.companyName} value={c.companyName}>{c.companyName}</option>)}
+            </select>
+
+            <select
+              value={recruiter}
+              onChange={e => setRecruiter(e.target.value)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white"
+            >
+              <option value="">All Recruiters</option>
+              {(team.length > 0 ? team : recruiters.map((r: any) => ({ id: r._id || r.id, name: r.name }))).map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Key Summary Metrics Slicers (6 Items) ── */}
+      <div>
+        <h2 className="text-slate-800 text-sm mb-3" style={{ fontWeight: 700 }}>Team Overview Summary</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { label: "Total Calls Done", value: String(totalCallsDone), change: 'Calls', color: 'blue', icon: Phone, slicerKey: 'Today Calls' },
+            { label: 'Eligible', value: String(totalEligible), change: 'Eligible', color: 'emerald', icon: UserCheck, slicerKey: 'Eligible Candidates' },
+            { label: 'Final Select', value: String(totalFinalSelect), change: 'L1/Final', color: 'violet', icon: BadgeCheck, slicerKey: '__final_select_group' },
+            { label: 'Documentation Completed', value: String(totalDocCompleted), change: 'Doc Done', color: 'amber', icon: FileText, slicerKey: 'Documentation' },
+            { label: 'Offer Accept', value: String(totalOfferAccept), change: 'Offered', color: 'purple', icon: Target, slicerKey: 'Offer Accept' },
+            { label: 'Joined', value: String(totalJoined), change: 'Placed', color: 'emerald', icon: CheckCircle2, slicerKey: 'Joined' },
+          ].map((m, i) => {
+            const Icon = m.icon || UserPlus;
+            const c = topColorMap[m.color] || topColorMap.emerald;
+            const isSelected = activeSlicer === m.slicerKey;
             return (
-              <div key={r.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-700 text-sm" style={{ fontWeight: 600 }}>
-                          {r.name.split(' ').map(n => n[0]).join('')}
-                        </span>
-                      </div>
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${sc.dot}`} />
-                    </div>
-                    <div>
-                      <button
-                        onClick={() => openRecruiterDetail(r)}
-                        className="text-slate-700 text-sm hover:text-green-600 transition-colors text-left flex items-center gap-2"
-                        style={{ fontWeight: 600 }}
-                      >
-                        {r.name}
-                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                      </button>
-                      <p className="text-slate-400 text-xs">Joined: {r.joined}</p>
-                    </div>
+              <button
+                key={i}
+                onClick={() => setActiveSlicer(isSelected ? 'All' : m.slicerKey)}
+                className={`bg-white rounded-xl p-4 border shadow-xs text-left transition-all hover:shadow-md cursor-pointer ${c.card} ${
+                  isSelected ? 'ring-2 ring-green-600 shadow-md border-green-400' : ''
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${c.icon}`}>
+                    <Icon className="w-3.5 h-3.5" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${sc.badge}`} style={{ fontWeight: 500 }}>
-                      {r.status}
-                    </span>
-                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${c.badge}`}>
+                    {m.change}
+                  </span>
                 </div>
+                <div className="text-slate-800 font-extrabold text-xl leading-tight">{m.value}</div>
+                <div className="text-slate-500 text-xs mt-1 font-medium flex items-center justify-between">
+                  <span className="truncate">{m.label}</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400 flex-shrink-0 ml-1" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-                {/* Call Progress */}
-                <div className="mb-3">
-                  <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-                    <span>Calls: {r.calls} / {r.target}</span>
-                    <span style={{ fontWeight: 500 }}>{pct}%</span>
+      {/* ── Status Pipeline Cards (11 clickable) ── */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-xs p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Candidate Pipeline Status</h2>
+            <p className="text-slate-400 text-xs mt-0.5">Click any card to view filtered candidate list</p>
+          </div>
+          <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full">
+            {STATUS_CARDS.reduce((s, c) => s + c.count, 0)} total
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          {STATUS_CARDS.map((s, i) => {
+            const Icon = s.icon;
+            const c = STATUS_COLOR_MAP[s.color];
+            const isSelected = activeSlicer === s.label;
+            return (
+              <div key={i} className="relative">
+                <button
+                  onClick={() => setActiveSlicer(isSelected ? 'All' : s.label)}
+                  className={`w-full flex flex-col items-start p-3.5 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${c.card} ${
+                    isSelected ? 'ring-2 ring-green-600 shadow-md scale-102 border-green-400' : ''
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2.5 ${c.icon}`}>
+                    <Icon className="w-4 h-4" />
                   </div>
-                  <div className="bg-slate-100 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-green-500' : 'bg-amber-500'}`}
-                      style={{ width: `${pct}%` }}
-                    />
+                  <div className={`text-xl mb-0.5 ${c.badge}`} style={{ fontWeight: 800, lineHeight: 1 }}>
+                    {s.count}
                   </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-3 text-center">
-                  <div>
-                    <div className="text-slate-700 text-sm" style={{ fontWeight: 700 }}>{r.calls}</div>
-                    <div className="text-slate-400 text-xs">Calls Today</div>
-                  </div>
-                  <button onClick={() => navigate('/recruiter/interviews')} className="hover:bg-violet-50 rounded-lg py-1 transition-colors">
-                    <div className="text-violet-600 text-sm" style={{ fontWeight: 700 }}>{r.interviews}</div>
-                    <div className="text-slate-400 text-xs">Interviews</div>
-                  </button>
-                  <button onClick={() => navigate('/tl/follow-ups')} className="hover:bg-amber-50 rounded-lg py-1 transition-colors">
-                    <div className={`text-sm ${r.followUps > 5 ? 'text-amber-600' : 'text-slate-700'}`} style={{ fontWeight: 700 }}>{r.followUps}</div>
-                    <div className="text-slate-400 text-xs">Follow-Ups</div>
-                  </button>
-                  <button onClick={() => openRecruiterDetail(r)} className="hover:bg-green-50 rounded-lg py-1 transition-colors">
-                    <div className="text-green-700 text-sm" style={{ fontWeight: 700 }}>{r.activeCandidates}<span className="text-slate-400 text-xs font-normal">/{r.totalCandidates}</span></div>
-                    <div className="text-slate-400 text-xs">Active</div>
-                  </button>
-                </div>
+                  <div className="text-slate-500 text-xs leading-tight">{s.label}</div>
+                </button>
               </div>
             );
           })}
         </div>
+      </div>
+
+      {/* ── In-Place Slicer Filtered Data Section ── */}
+      <SlicerFilteredDataView
+        slicerName={activeSlicer}
+        division={division !== 'All' ? division : undefined}
+        company={company}
+        customer={customer}
+        recruiter={recruiter}
+        range={dateRange}
+        fromDate={customFrom}
+        toDate={customTo}
+        onClear={() => setActiveSlicer('All')}
+        title="Team Overview Pipeline Slicer"
+      />
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* ── Recruiter Performance Table ── */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between bg-white px-5 py-3 rounded-xl border border-slate-100 shadow-xs">
+            <h2 className="text-slate-800 text-sm" style={{ fontWeight: 700 }}>
+              Recruiter Performance ({dateRange})
+            </h2>
+            <span className="text-xs text-slate-400 font-medium">Select date range above</span>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-100 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider">
+                    <th className="px-4 py-3">Recruiter</th>
+                    <th className="px-3 py-3 text-center">Total Calls</th>
+                    <th className="px-3 py-3 text-center">Eligible</th>
+                    <th className="px-3 py-3 text-center">Final Select</th>
+                    <th className="px-3 py-3 text-center">Doc Completed</th>
+                    <th className="px-3 py-3 text-center">Offer Accept</th>
+                    <th className="px-3 py-3 text-center">Joined</th>
+                    <th className="px-3 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {team.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-8 text-slate-400">No recruiters found.</td>
+                    </tr>
+                  ) : (
+                    team.map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <button onClick={() => openRecruiterDetail(r)} className="font-bold text-slate-800 hover:text-green-600 transition-colors text-left cursor-pointer">
+                            {r.name}
+                          </button>
+                        </td>
+                        <td className="px-3 py-3 text-center font-semibold text-blue-600">{r.totalCalls}</td>
+                        <td className="px-3 py-3 text-center font-semibold text-emerald-600">{r.eligible}</td>
+                        <td className="px-3 py-3 text-center font-semibold text-indigo-600">{r.finalSelect}</td>
+                        <td className="px-3 py-3 text-center font-semibold text-amber-600">{r.docCompleted}</td>
+                        <td className="px-3 py-3 text-center font-semibold text-purple-600">{r.offerAccept}</td>
+                        <td className="px-3 py-3 text-center font-bold text-green-700">{r.joined}</td>
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            onClick={() => openRecruiterDetail(r)}
+                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-green-600 transition-colors cursor-pointer"
+                            title="View Candidates"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
 
         {/* Right Panel */}
         <div className="space-y-4">
-
-
           {/* My Tasks */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -327,7 +573,7 @@ export function TLDashboard() {
         </div>
 
         {/* Team Performance Reviews Section */}
-        <div className="mt-8">
+        <div className="mt-8 lg:col-span-3">
           <TeamPerformanceReviews />
         </div>
       </div>
@@ -344,12 +590,12 @@ export function TLDashboard() {
                 </div>
                 <div>
                   <h2 className="text-lg text-slate-800" style={{ fontWeight: 700 }}>{selectedRecruiter.name}</h2>
-                  <p className="text-xs text-slate-500">Joined: {selectedRecruiter.joined}</p>
+                  <p className="text-xs text-slate-500">Joined: {selectedRecruiter.joinedDate}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedRecruiter(null)}
-                className="text-slate-400 hover:text-slate-600 p-2 hover:bg-white rounded-lg transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-2 hover:bg-white rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -418,7 +664,7 @@ export function TLDashboard() {
                         <button
                           key={cand._id || cand.id}
                           onClick={() => openTLCandidateView(cand)}
-                          className="w-full text-left p-3 border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-green-300 transition-colors group"
+                          className="w-full text-left p-3 border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-green-300 transition-colors group cursor-pointer"
                         >
                           <div className="flex items-start justify-between">
                             <div>
@@ -442,7 +688,7 @@ export function TLDashboard() {
               <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
                 <button
                   onClick={() => setSelectedRecruiter(null)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
                   style={{ fontWeight: 500 }}
                 >
                   Close
@@ -452,7 +698,7 @@ export function TLDashboard() {
                     navigate(`/tl/my-team`);
                     setSelectedRecruiter(null);
                   }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors cursor-pointer"
                   style={{ fontWeight: 500 }}
                 >
                   View All Candidates

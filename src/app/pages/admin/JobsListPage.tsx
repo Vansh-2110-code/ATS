@@ -115,9 +115,9 @@ export function JobsListPage() {
       api.getJobs({ status: 'On Hold', limit: '1', company: companyQ || undefined, division: divisionQ || undefined }),
     ]).then(([open, closed, hold]) => {
       setStats({
-        open: open.pagination?.totalPositions || 0,
-        closed: closed.pagination?.totalPositions || 0,
-        onHold: hold.pagination?.totalPositions || 0,
+        open: (open as any)?.pagination?.totalPositions ?? (open as any)?.pagination?.total ?? 0,
+        closed: (closed as any)?.pagination?.totalPositions ?? (closed as any)?.pagination?.total ?? 0,
+        onHold: (hold as any)?.pagination?.totalPositions ?? (hold as any)?.pagination?.total ?? 0,
       });
     }).catch(() => {});
   }, [companyQ, divisionQ]);
@@ -421,16 +421,44 @@ export function JobsListPage() {
           )}
 
           {pagination.pages > 1 && (
-            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400">Page {page} of {pagination.pages}</span>
-              <div className="flex gap-1">
-                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600">
-                  <ChevronLeft className="w-4 h-4" />
+            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 pr-20 bg-slate-50/50">
+              <div className="text-xs text-slate-500 font-medium">
+                Showing Page <span className="font-bold text-slate-800">{page}</span> of <span className="font-bold text-slate-800">{pagination.pages}</span> ({pagination.total || 0} total JRs)
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => p - 1)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
                 </button>
-                <button disabled={page >= pagination.pages} onClick={() => setPage(p => p + 1)}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600">
-                  <ChevronRight className="w-4 h-4" />
+
+                {/* Page Number Pills */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: pagination.pages }, (_, idx) => idx + 1).map(pNum => (
+                    <button
+                      key={pNum}
+                      onClick={() => setPage(pNum)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        page === pNum
+                          ? 'bg-green-600 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  disabled={page >= pagination.pages}
+                  onClick={() => setPage(p => p + 1)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

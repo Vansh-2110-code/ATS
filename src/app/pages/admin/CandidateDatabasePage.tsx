@@ -33,8 +33,15 @@ export function CandidateDatabasePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const stateFilter = (location.state as any)?.sourceFilter as string | undefined;
-  const stateStatusFilter = (location.state as any)?.statusFilter as string | undefined;
+
+  const searchParams = new URLSearchParams(location.search);
+  const initialSource = searchParams.get('sourceFilter') || (location.state as any)?.sourceFilter || '';
+  const initialStatus = searchParams.get('statusFilter') || (location.state as any)?.statusFilter || '';
+  const initialStatusIn = searchParams.get('statusIn') || '';
+  const initialDivision = searchParams.get('division') || '';
+  const initialCompany = searchParams.get('clientName') || searchParams.get('company') || '';
+  const initialTlId = searchParams.get('tlId') || '';
+  const initialRecruiter = searchParams.get('recruiter') || '';
 
   // Role-based access: Only Admin and Manager can view candidate database
   useEffect(() => {
@@ -46,8 +53,13 @@ export function CandidateDatabasePage() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState(stateFilter || '');
-  const [statusFilter, setStatusFilter] = useState(stateStatusFilter || '');
+  const [sourceFilter, setSourceFilter] = useState(initialSource);
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [statusInFilter, setStatusInFilter] = useState(initialStatusIn);
+  const [divisionFilter, setDivisionFilter] = useState(initialDivision);
+  const [companyFilter, setCompanyFilter] = useState(initialCompany);
+  const [tlFilter, setTlFilter] = useState(initialTlId);
+  const [recruiterFilter, setRecruiterFilter] = useState(initialRecruiter);
   const [reassignFilter, setReassignFilter] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -99,6 +111,11 @@ export function CandidateDatabasePage() {
       if (search) params.search = search;
       if (sourceFilter) params.source = sourceFilter;
       if (statusFilter) params.status = statusFilter;
+      if (statusInFilter) params.statusIn = statusInFilter;
+      if (divisionFilter && divisionFilter !== 'All') params.division = divisionFilter;
+      if (companyFilter && companyFilter !== 'All Companies') params.company = companyFilter;
+      if (tlFilter && tlFilter !== 'All Team Leaders') params.tlId = tlFilter;
+      if (recruiterFilter && recruiterFilter !== 'All Recruiters') params.recruiter = recruiterFilter;
       if (fromDate) params.fromDate = fromDate;
       if (toDate) params.toDate = toDate;
       
@@ -135,6 +152,11 @@ export function CandidateDatabasePage() {
       if (search) params.search = search;
       if (sourceFilter) params.source = sourceFilter;
       if (statusFilter) params.status = statusFilter;
+      if (statusInFilter) params.statusIn = statusInFilter;
+      if (divisionFilter && divisionFilter !== 'All') params.division = divisionFilter;
+      if (companyFilter && companyFilter !== 'All Companies') params.company = companyFilter;
+      if (tlFilter && tlFilter !== 'All Team Leaders') params.tlId = tlFilter;
+      if (recruiterFilter && recruiterFilter !== 'All Recruiters') params.recruiter = recruiterFilter;
       if (reassignFilter) params.reassignRequested = 'true';
       if (fromDate) params.fromDate = fromDate;
       if (toDate) params.toDate = toDate;
@@ -146,7 +168,7 @@ export function CandidateDatabasePage() {
     } finally {
       setLoading(false);
     }
-  }, [search, sourceFilter, statusFilter, reassignFilter, fromDate, toDate, page]);
+  }, [search, sourceFilter, statusFilter, statusInFilter, divisionFilter, companyFilter, tlFilter, recruiterFilter, reassignFilter, fromDate, toDate, page]);
 
   // Stats fetch (no filters)
   useEffect(() => {
@@ -168,19 +190,25 @@ export function CandidateDatabasePage() {
   useEffect(() => { fetchCandidates(); }, [fetchCandidates]);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [search, sourceFilter, statusFilter, reassignFilter, fromDate, toDate]);
+  useEffect(() => { setPage(1); }, [search, sourceFilter, statusFilter, statusInFilter, divisionFilter, companyFilter, tlFilter, recruiterFilter, reassignFilter, fromDate, toDate]);
 
   const clearFilters = () => {
     setSearch('');
     setSourceFilter('');
     setStatusFilter('');
+    setStatusInFilter('');
+    setDivisionFilter('');
+    setCompanyFilter('');
+    setTlFilter('');
+    setRecruiterFilter('');
     setReassignFilter(false);
     setFromDate('');
     setToDate('');
     setPage(1);
+    navigate('/admin/candidates', { replace: true });
   };
 
-  const hasFilters = !!(search || sourceFilter || statusFilter || reassignFilter || fromDate || toDate);
+  const hasFilters = !!(search || sourceFilter || statusFilter || statusInFilter || divisionFilter || companyFilter || tlFilter || recruiterFilter || reassignFilter || fromDate || toDate);
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -218,13 +246,14 @@ export function CandidateDatabasePage() {
         {/* Stats Row Slicers */}
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Total Candidates', value: stats.total, icon: Users, color: 'text-slate-700', bg: statusFilter === '' && !reassignFilter ? 'bg-green-100 ring-2 ring-green-500' : 'bg-white', status: '' },
-            { label: 'Selected', value: stats.selected, icon: UserCheck, color: 'text-emerald-600', bg: statusFilter === 'Selected' ? 'bg-emerald-100 ring-2 ring-emerald-500' : 'bg-emerald-50', status: 'Selected' },
-            { label: 'Joined', value: stats.joined, icon: UserCheck, color: 'text-green-600', bg: statusFilter === 'Joined' ? 'bg-green-100 ring-2 ring-green-500' : 'bg-green-50', status: 'Joined' },
-            { label: 'Reassign Pending', value: stats.reassignPending, icon: RefreshCw, color: 'text-orange-500', bg: reassignFilter ? 'bg-orange-100 ring-2 ring-orange-400' : 'bg-orange-50', status: 'reassign' },
+            { label: 'Total Candidates', value: stats.total, icon: Users, color: 'text-slate-700', bg: statusFilter === '' && !statusInFilter && !reassignFilter ? 'bg-slate-100 ring-2 ring-slate-400 shadow-sm' : 'bg-white', status: '' },
+            { label: 'Selected', value: stats.selected, icon: UserCheck, color: 'text-emerald-600', bg: statusFilter === 'Selected' ? 'bg-emerald-100 ring-2 ring-emerald-500 shadow-sm' : 'bg-white', status: 'Selected' },
+            { label: 'Joined', value: stats.joined, icon: UserCheck, color: 'text-green-600', bg: statusFilter === 'Joined' ? 'bg-green-100 ring-2 ring-green-500 shadow-sm' : 'bg-white', status: 'Joined' },
+            { label: 'Reassign Pending', value: stats.reassignPending, icon: RefreshCw, color: 'text-orange-500', bg: reassignFilter ? 'bg-orange-100 ring-2 ring-orange-400 shadow-sm' : 'bg-white', status: 'reassign' },
           ].map((s, i) => (
             <div key={i}
               onClick={() => {
+                setStatusInFilter('');
                 if (s.status === 'reassign') {
                   setReassignFilter(f => !f);
                   setStatusFilter('');
@@ -234,7 +263,7 @@ export function CandidateDatabasePage() {
                 }
               }}
               className={`${s.bg} rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all`}>
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
                 <s.icon className={`w-5 h-5 ${s.color}`} />
               </div>
               <div>
@@ -244,6 +273,30 @@ export function CandidateDatabasePage() {
             </div>
           ))}
         </div>
+
+        {/* Active Filter Notification Bar */}
+        {hasFilters && (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2 flex-wrap text-sm font-semibold text-emerald-900">
+              <Filter className="w-4 h-4 text-emerald-600" />
+              <span>Active Filter:</span>
+              {statusInFilter && <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">Stage Filter Active</span>}
+              {statusFilter && <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">Status: {statusFilter}</span>}
+              {divisionFilter && <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold border border-blue-300">Division: {divisionFilter}</span>}
+              {companyFilter && <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-bold border border-purple-300">Company: {companyFilter}</span>}
+              {tlFilter && <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300">TL Filter Active</span>}
+              {recruiterFilter && <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-300">Recruiter Filter Active</span>}
+              {reassignFilter && <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-xs font-bold border border-orange-300">Reassign Pending</span>}
+              <span className="text-emerald-700 text-xs font-medium">({pagination.total || candidates.length} candidates found)</span>
+            </div>
+            <button
+              onClick={clearFilters}
+              className="text-xs text-red-600 font-bold hover:text-red-700 flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-red-200 hover:bg-red-50 transition-all cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" /> Clear Filters
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-wrap gap-3 items-center">
@@ -526,18 +579,44 @@ export function CandidateDatabasePage() {
 
           {/* Pagination */}
           {pagination.pages > 1 && (
-            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                Page {page} of {pagination.pages} · {pagination.total.toLocaleString()} total
-              </span>
-              <div className="flex gap-1">
-                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600 transition-colors">
-                  <ChevronLeft className="w-4 h-4" />
+            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 pr-20 bg-slate-50/50">
+              <div className="text-xs text-slate-500 font-medium">
+                Showing Page <span className="font-bold text-slate-800">{page}</span> of <span className="font-bold text-slate-800">{pagination.pages}</span> ({pagination.total?.toLocaleString() || 0} total candidates)
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => p - 1)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
                 </button>
-                <button disabled={page >= pagination.pages} onClick={() => setPage(p => p + 1)}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600 transition-colors">
-                  <ChevronRight className="w-4 h-4" />
+
+                {/* Page Number Pills */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: pagination.pages }, (_, idx) => idx + 1).map(pNum => (
+                    <button
+                      key={pNum}
+                      onClick={() => setPage(pNum)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        page === pNum
+                          ? 'bg-green-600 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  disabled={page >= pagination.pages}
+                  onClick={() => setPage(p => p + 1)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

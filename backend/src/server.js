@@ -95,6 +95,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/teams', teamRoutes);
 app.use('/api/admin/field-config', fieldConfigRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/notifications', notificationRoutes);

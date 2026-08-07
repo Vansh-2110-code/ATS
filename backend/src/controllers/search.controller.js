@@ -44,39 +44,8 @@ const buildDynamicQuery = (model, q) => {
 };
 
 const buildCandidateVisibilityQuery = async (user) => {
-  const query = {};
-  if (user.role === 'recruiter' || user.role === 'spoc') {
-    query.assignedRecruiter = user._id;
-    return query;
-  }
-
-  if (user.role === 'tl') {
-    const teamMembers = await TeamMember.find({
-      teamLeaderId: user._id,
-      removedAt: null,
-    }).select('memberId');
-    const memberIds = teamMembers.map(m => m.memberId);
-    memberIds.push(user._id);
-    query.assignedRecruiter = { $in: memberIds };
-    return query;
-  }
-
-  if (user.role === 'manager') {
-    const tlUsers = await User.find({ role: 'tl', status: 'Active' }).select('_id');
-    const tlIds = tlUsers.map(t => t._id);
-    const allTeamMembers = await TeamMember.find({
-      teamLeaderId: { $in: tlIds },
-      removedAt: null,
-    }).select('memberId');
-
-    const recruiterIds = allTeamMembers.map(m => m.memberId);
-    recruiterIds.push(...tlIds);
-    recruiterIds.push(user._id);
-    query.assignedRecruiter = { $in: recruiterIds };
-    return query;
-  }
-
-  return query;
+  // Requirement 6: Everyone should be able to search candidates by Mobile no, Mail id, Skills, Name in Global Search
+  return {};
 };
 
 const buildWalkInVisibilityQuery = async (user) => {
@@ -199,7 +168,16 @@ exports.globalSearch = async (req, res, next) => {
     const taskVisibility = await buildTaskVisibilityQuery(req.user);
     const perBucket = Math.max(4, Math.ceil(limit / 8));
 
-    const candidateQuery = buildDynamicQuery(Candidate, q);
+    const qRegex = { $regex: escapeRegex(q), $options: 'i' };
+    const candidateQuery = {
+      $or: [
+        { name: qRegex },
+        { phone: qRegex },
+        { email: qRegex },
+        { skills: qRegex },
+        { candidateId: qRegex },
+      ]
+    };
     const walkInQuery = buildDynamicQuery(WalkIn, q);
     const jobQuery = buildDynamicQuery(Job, q);
     const companyQuery = buildDynamicQuery(Company, q);

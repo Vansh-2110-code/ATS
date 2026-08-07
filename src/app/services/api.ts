@@ -213,6 +213,14 @@ class ApiService {
     return this.request<any>('/candidates', { method: 'POST', body: data });
   }
 
+  async getCallBackReminders() {
+    return this.request<any>('/candidates/callbacks');
+  }
+
+  async getRecruiters() {
+    return this.request<any[]>('/users/recruiters');
+  }
+
   async updateCandidate(id: string, data: FormData | Record<string, any>) {
     const body = data instanceof FormData ? data : JSON.stringify(data);
     return this.request<any>(`/candidates/${id}`, { method: 'PUT', body: body as any });
@@ -369,10 +377,6 @@ class ApiService {
   async getUsers(params: Record<string, string> = {}) {
     const query = new URLSearchParams(params).toString();
     return this.request<any>(`/users${query ? `?${query}` : ''}`);
-  }
-
-  async getRecruiters() {
-    return this.request<any>('/users/recruiters');
   }
 
 
@@ -575,8 +579,9 @@ class ApiService {
     return this.request<any>(`/dashboard/manager${query ? `?${query}` : ''}`);
   }
 
-  async getAdminDashboard() {
-    return this.request<any>('/dashboard/admin');
+  async getAdminDashboard(params: Record<string, string> = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request<any>(`/dashboard/admin${query ? `?${query}` : ''}`);
   }
 
   async getAllTeamsDashboard() {
@@ -595,9 +600,11 @@ class ApiService {
     });
   }
 
-  async getDivisionDashboard(division: string, company?: string) {
+  async getDivisionDashboard(division: string, company?: string, tlId?: string, recruiterId?: string) {
     const params = new URLSearchParams({ division });
     if (company && company !== 'All Companies') params.append('company', company);
+    if (tlId && tlId !== 'All Team Leaders') params.append('tlId', tlId);
+    if (recruiterId && recruiterId !== 'All Recruiters') params.append('recruiterId', recruiterId);
     return this.request<any>(`/dashboard/division?${params.toString()}`);
   }
 
@@ -1142,7 +1149,7 @@ class ApiService {
   // Add team member (TL can add recruiters)
   // Add team member (TL adds to their team, Admin adds to specific TL)
   async addTeamMember(employeeId: string, tlId?: string) {
-    return this.request<any>('/team/members/add', {
+    return this.request<any>('/teams/members/add', {
       method: 'POST',
       body: JSON.stringify(tlId ? { employeeId, tlId } : { employeeId }),
     });
@@ -1150,7 +1157,7 @@ class ApiService {
 
   // Remove team member
   async removeTeamMember(employeeId: string, tlId?: string) {
-    return this.request<any>('/team/members/remove', {
+    return this.request<any>('/teams/members/remove', {
       method: 'POST',
       body: JSON.stringify(tlId ? { employeeId, tlId } : { employeeId }),
     });
@@ -1158,18 +1165,18 @@ class ApiService {
 
   // Get members of a team (TL gets own, Admin gets specific TL's)
   async getTeamMembers(tlId?: string) {
-    const url = tlId ? `/team/members?tlId=${tlId}` : '/team/members';
+    const url = tlId ? `/teams/members?tlId=${tlId}` : '/teams/members';
     return this.request<any>(url, { method: 'GET' });
   }
 
   // Get all team leaders (for Admin/Manager)
   async getTeamLeaders() {
-    return this.request<any>('/team/leaders', { method: 'GET' });
+    return this.request<any>('/teams/leaders', { method: 'GET' });
   }
 
   // Add team leader (Admin/Manager only)
   async addTeamLeader(employeeId: string) {
-    return this.request<any>('/team/leaders/add', {
+    return this.request<any>('/teams/leaders/add', {
       method: 'POST',
       body: JSON.stringify({ employeeId }),
     });
@@ -1177,7 +1184,7 @@ class ApiService {
 
   // Remove team leader (Admin/Manager only)
   async removeTeamLeader(employeeId: string) {
-    return this.request<any>('/team/leaders/remove', {
+    return this.request<any>('/teams/leaders/remove', {
       method: 'POST',
       body: JSON.stringify({ employeeId }),
     });
@@ -1185,7 +1192,7 @@ class ApiService {
 
   // Get available employees for team assignment
   async getAvailableEmployees(role?: string) {
-    const url = role ? `/team/available?role=${role}` : '/team/available';
+    const url = role ? `/teams/available?role=${role}` : '/teams/available';
     return this.request<any>(url, { method: 'GET' });
   }
 

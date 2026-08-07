@@ -93,7 +93,7 @@ export function DashboardLayout() {
         localStorage.setItem(todayKey(user.id), label);
       } else {
         // Enforce face scanner immediately on login if not marked (unless biometric disabled)
-        if (!user.disableBiometric) {
+        if (!user.disableBiometric && user.role !== 'admin') {
           setShowCheckInFaceModal(true);
         } else {
           completeMarkAttendance(user.isWFH || false);
@@ -101,7 +101,7 @@ export function DashboardLayout() {
       }
     }).catch(() => {
       // Fallback: trigger face scanner if todayStatus cannot be verified (unless biometric disabled)
-      if (!user.disableBiometric) {
+      if (!user.disableBiometric && user.role !== 'admin') {
         setShowCheckInFaceModal(true);
       } else {
         completeMarkAttendance(user.isWFH || false);
@@ -151,6 +151,54 @@ export function DashboardLayout() {
     const interval = setInterval(fetchUnreadCount, 30_000);
     return () => clearInterval(interval);
   }, [user]);
+
+  // ── Call Back Reminders Polling ──────────────────────────────
+  const [activeCallBack, setActiveCallBack] = useState<any | null>(null);
+  const [dismissedCallBacks, setDismissedCallBacks] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!user) return;
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    const checkCallBacks = async () => {
+      try {
+        const res = await api.getCallBackReminders();
+        const list = res?.callbacks || [];
+        const now = Date.now();
+
+        for (const cand of list) {
+          if (!cand.callBack) continue;
+          const cbTime = new Date(cand.callBack).getTime();
+          if (isNaN(cbTime)) continue;
+
+          // Due now (within 2 hours window) and not snoozed
+          const isDueNow = cbTime <= now && (now - cbTime) <= 1000 * 60 * 60 * 2;
+          const snoozedUntil = dismissedCallBacks[cand._id] || 0;
+
+          if (isDueNow && now > snoozedUntil) {
+            setActiveCallBack(cand);
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification(`⏰ Call Back Reminder: ${cand.name}`, {
+                  body: `Scheduled call back for ${cand.positionApplied || 'Candidate'} (${cand.phone})`,
+                  icon: '/favicon.ico',
+                });
+              } catch { /* ignore */ }
+            }
+            break;
+          }
+        }
+      } catch { /* ignore */ }
+    };
+
+    checkCallBacks();
+    const interval = setInterval(checkCallBacks, 15_000);
+    return () => clearInterval(interval);
+  }, [user, dismissedCallBacks]);
 
   // Fetch full list when bell is opened
   useEffect(() => {
@@ -628,6 +676,83 @@ export function DashboardLayout() {
         preventCancel={true}
         registeredDescriptor={user?.faceDescriptor}
       />
+      {/* ⏰ CALL BACK REMINDER POPUP MODAL */}
+      {activeCallBack && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 text-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-amber-600">
+                <Clock className="w-5 h-5 animate-bounce" />
+                <h3 className="text-base font-bold">Call Back Reminder!</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setDismissedCallBacks(prev => ({ ...prev, [activeCallBack._id]: Date.now() + 1000 * 60 * 5 }));
+                  setActiveCallBack(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="font-bold text-slate-900 text-base">{activeCallBack.name}</h4>
+                  <p className="text-slate-500 text-xs">{activeCallBack.positionApplied || 'Position N/A'} · JR {activeCallBack.jrNumber || 'N/A'}</p>
+                </div>
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold">
+                  Scheduled Call Back
+                </span>
+              </div>
+
+              <div className="pt-2 border-t border-amber-200/50 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 block">Phone</span>
+                  <a href={`tel:${activeCallBack.phone}`} className="font-bold text-blue-600 hover:underline flex items-center gap-1">
+                    <Phone className="w-3 h-3" /> {activeCallBack.phone}
+                  </a>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Company</span>
+                  <span className="font-semibold text-slate-700">{activeCallBack.clientName || 'N/A'}</span>
+                </div>
+              </div>
+
+              {activeCallBack.comments && (
+                <div className="pt-2 border-t border-amber-200/50 text-xs text-slate-600 italic">
+                  "{activeCallBack.comments}"
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  const id = activeCallBack._id;
+                  setDismissedCallBacks(prev => ({ ...prev, [id]: Date.now() + 1000 * 60 * 60 * 24 }));
+                  setActiveCallBack(null);
+                  navigate(`/recruiter/candidate/${id}`);
+                }}
+                className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Phone className="w-4 h-4" /> View Profile / Call Now
+              </button>
+              <button
+                onClick={() => {
+                  const id = activeCallBack._id;
+                  setDismissedCallBacks(prev => ({ ...prev, [id]: Date.now() + 1000 * 60 * 5 }));
+                  setActiveCallBack(null);
+                }}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-sm transition-colors"
+              >
+                Snooze 5m
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ChatbotWidget mode="internal" />
     </div>
   );

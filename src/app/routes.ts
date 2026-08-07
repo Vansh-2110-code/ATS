@@ -131,11 +131,13 @@ export const router = createBrowserRouter([
       { path: '/tl/my-team', Component: MyTeamPage },
       { path: '/tl/follow-ups', Component: TLFollowUpPage },
       { path: '/tl/performance-reviews', Component: PerformanceReviewPage },
+      { path: '/tl/candidate/:id', Component: CandidateProfilePage },
 
       // Manager
       { path: '/manager', Component: ManagerDashboard },
       { path: '/manager/reports', Component: ReportsPage },
       { path: '/manager/performance-reviews', Component: PerformanceReviewPage },
+      { path: '/manager/candidate/:id', Component: CandidateProfilePage },
 
       // Admin
       { path: '/admin', Component: AdminDashboard },
@@ -144,6 +146,7 @@ export const router = createBrowserRouter([
       { path: '/admin/logs', Component: SystemLogsPage },
       { path: '/admin/users', Component: UserManagementPage },
       { path: '/admin/candidates', Component: CandidateDatabasePage },
+      { path: '/admin/candidate/:id', Component: CandidateProfilePage },
       { path: '/admin/excel-import', Component: ExcelCandidateImportPage },
       { path: '/admin/ats-records',  Component: AtsDashboardPage },
       { path: '/admin/field-config', Component: FieldConfigurationPage },

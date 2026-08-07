@@ -60,6 +60,8 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const [statusFilter, setStatusFilter] = useState(() => lockedStatus || locationState?.statusFilter || 'All Status');
   const [companyFilter, setCompanyFilter] = useState('All Companies');
   const [divisionFilter, setDivisionFilter] = useState('All Divisions');
+  const [recruiterFilter, setRecruiterFilter] = useState('All Recruiters');
+  const [recruiterList, setRecruiterList] = useState<any[]>([]);
   const [companyList, setCompanyList] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(true);
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -356,6 +358,15 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
     setVisibleCols(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  useEffect(() => {
+    api.getRecruiters?.()
+      .then((res: any) => {
+        const list = Array.isArray(res) ? res : (res?.users || res?.recruiters || []);
+        setRecruiterList(list);
+      })
+      .catch(() => {});
+  }, []);
+
   const filtered = candidates.filter(c => {
     const matchSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -374,18 +385,25 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
       divisionFilter === 'All Divisions' ||
       (c.division && c.division.toLowerCase() === divisionFilter.toLowerCase());
 
-    return matchSearch && matchStatus && matchCompany && matchDivision;
+    const matchRecruiter =
+      recruiterFilter === 'All Recruiters' ||
+      (c.recruiter && c.recruiter.toLowerCase() === recruiterFilter.toLowerCase()) ||
+      (c.assignedRecruiter && String(c.assignedRecruiter) === recruiterFilter);
+
+    return matchSearch && matchStatus && matchCompany && matchDivision && matchRecruiter;
   });
 
   const hasActiveFilters =
     statusFilter !== 'All Status' ||
     companyFilter !== 'All Companies' ||
-    divisionFilter !== 'All Divisions';
+    divisionFilter !== 'All Divisions' ||
+    recruiterFilter !== 'All Recruiters';
 
   const clearAll = () => {
     setStatusFilter('All Status');
     setCompanyFilter('All Companies');
     setDivisionFilter('All Divisions');
+    setRecruiterFilter('All Recruiters');
   };
 
   const visibleCount = Object.values(visibleCols).filter(Boolean).length;
@@ -716,6 +734,22 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                 <option value="BPO">BPO</option>
                 <option value="IT">IT</option>
                 <option value="Lateral">Lateral</option>
+              </select>
+            </div>
+
+            {/* Recruiter (Req 24 & 25) */}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Recruiter</label>
+              <select
+                value={recruiterFilter}
+                onChange={e => setRecruiterFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-44"
+              >
+                <option value="All Recruiters">All Recruiters</option>
+                {recruiterList.map((r: any) => {
+                  const rName = r.name || r.userName || r.email || r;
+                  return <option key={r._id || rName} value={rName}>{rName}</option>;
+                })}
               </select>
             </div>
 

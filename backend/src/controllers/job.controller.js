@@ -13,14 +13,9 @@ exports.list = async (req, res, next) => {
         { jrNumber: { $regex: search, $options: 'i' } },
       ];
     }
-    if (status) query.status = status;
+    if (status) query.status = { $regex: new RegExp(`^${status.trim()}$`, 'i') };
     if (company) query.companyName = { $regex: company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), $options: 'i' };
-    if (division) query.division = division;
-
-    // Hide Closed priority jobs from non-admin users
-    if (req.user && req.user.role !== 'admin') {
-      query.priority = { $ne: 'Closed' };
-    }
+    if (division && division !== 'All') query.division = { $regex: new RegExp(`^${division.trim()}$`, 'i') };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [jobs, total, totalPositionsResult] = await Promise.all([
@@ -28,10 +23,10 @@ exports.list = async (req, res, next) => {
       Job.countDocuments(query),
       Job.aggregate([
         { $match: query },
-        { $group: { _id: null, sum: { $sum: '$positions' } } }
+        { $group: { _id: null, sum: { $sum: { $toInt: { $ifNull: ['$positions', 1] } } } } }
       ])
     ]);
-    const totalPositions = totalPositionsResult[0]?.sum || 0;
+    const totalPositions = totalPositionsResult[0]?.sum || total;
 
     // Attach candidate counts per job title & jrNumber (batch lookup)
     const Candidate = require('../models/Candidate');
