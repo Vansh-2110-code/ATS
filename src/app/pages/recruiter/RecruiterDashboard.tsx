@@ -11,9 +11,6 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { getGreeting } from '../../utils/greetingUtils';
-import { SlicerFilteredDataView } from '../../components/SlicerFilteredDataView';
-import { dedupeCompanies } from '../../utils/companyUtils';
-import { CANDIDATE_STATUS_OPTIONS } from '../../utils/candidateStatusUtils';
 
 // ─── Date Filter ────────────────────────────────────────────
 type DateRange = 'Day' | 'Week' | 'Quarter' | 'Year' | 'All' | 'Custom';
@@ -56,11 +53,10 @@ const STATUS_COLOR_MAP: Record<string, { card: string; icon: string; badge: stri
 
 // ─── Top Metrics ─────────────────────────────────────────────
 const colorMap: Record<string, { card: string; icon: string; badge: string; text: string }> = {
-  blue:    { card: 'border-blue-100   bg-blue-50/40',     icon: 'bg-blue-100   text-blue-600',    badge: 'bg-blue-100   text-blue-700',   text: 'text-blue-600' },
+  blue:    { card: 'border-green-100  bg-green-50/40',    icon: 'bg-green-100  text-green-600',   badge: 'bg-green-100  text-green-700',  text: 'text-green-600' },
   amber:   { card: 'border-amber-100  bg-amber-50/40',    icon: 'bg-amber-100  text-amber-600',   badge: 'bg-amber-100  text-amber-700',  text: 'text-amber-600' },
   violet:  { card: 'border-violet-100 bg-violet-50/40',   icon: 'bg-violet-100 text-violet-600',  badge: 'bg-violet-100 text-violet-700', text: 'text-violet-600' },
   emerald: { card: 'border-emerald-100 bg-emerald-50/40', icon: 'bg-emerald-100 text-emerald-600', badge: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-600' },
-  cyan:    { card: 'border-cyan-100    bg-cyan-50/40',    icon: 'bg-cyan-100    text-cyan-600',    badge: 'bg-cyan-100    text-cyan-700',    text: 'text-cyan-600' },
 };
 
 const activityColors: Record<string, string> = {
@@ -86,9 +82,8 @@ export function RecruiterDashboard() {
   const [companies, setCompanies] = useState<any[]>([]);
   const [recruiters, setRecruiters] = useState<any[]>([]);
   const [topJobs, setTopJobs] = useState<any[]>([]);
-  const [loading, setLoading]       = useState(false);
-  const [dashData, setDashData]     = useState<any>(null);
-  const [activeSlicer, setActiveSlicer] = useState<string>('All');
+  const [loading, setLoading] = useState(true);
+  const [dashData, setDashData] = useState<any>(null);
   
   const [onboardingStatus, setOnboardingStatus] = useState<{ submitted: boolean; approved: boolean } | null>(null);
 
@@ -116,8 +111,7 @@ export function RecruiterDashboard() {
       (api as any).getRecruiters ? (api as any).getRecruiters() : Promise.resolve([]),
       api.getJobs ? api.getJobs({ status: 'Open', limit: '2' }) : Promise.resolve({ jobs: [] })
     ]).then(([compData, recData, jobData]: any) => {
-      const rawComps = Array.isArray(compData) ? compData : (compData?.companies || []);
-      setCompanies(dedupeCompanies(rawComps));
+      setCompanies(Array.isArray(compData) ? compData : (compData?.companies || []));
       setRecruiters(Array.isArray(recData) ? recData : (recData?.users || []));
       setTopJobs(jobData?.jobs || []);
     }).catch(console.error);
@@ -146,12 +140,14 @@ export function RecruiterDashboard() {
     }
   };
 
-  const STATUS_CARDS = CANDIDATE_STATUS_OPTIONS.map((label, i) => ({
-    label,
-    count: dashData?.pipeline?.[label] || 0,
-    color: STATUS_COLOR_LIST[i % STATUS_COLOR_LIST.length],
-    icon: STATUS_ICON_MAP[label] || UserCheck,
-  }));
+  const STATUS_CARDS = dashData?.pipeline
+    ? Object.entries(dashData.pipeline).map(([label, count]: any, i: number) => ({
+        label,
+        count: count || 0,
+        color: STATUS_COLOR_LIST[i % STATUS_COLOR_LIST.length],
+        icon: STATUS_ICON_MAP[label] || UserCheck,
+      }))
+    : [];
 
   const followUps = dashData?.followUps || [];
   const metrics = {
@@ -254,23 +250,38 @@ export function RecruiterDashboard() {
         </div>
       )}
 
-      {/* ── Division Tabs ── */}
-      <div className="flex gap-2 border-b border-slate-200">
-        {['IT', 'BPO', 'Lateral'].map(div => (
-          <button
-            key={div}
-            onClick={() => setDivision(div)}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${division === div ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            {div}
-          </button>
-        ))}
-      </div>
+      {/* Moved Division Tabs into the filter bar below */}
 
       {/* ── Date Filter Bar ── */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-slate-400 mr-1" style={{ fontWeight: 600 }}>FILTER BY:</span>
+          
+          {/* Division Pills (Division Dashboard style) */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mr-2">
+            {['IT', 'BPO', 'Lateral'].map(div => (
+              <button
+                key={div}
+                onClick={() => setDivision(div)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  division === div ? 'bg-green-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                {div}
+              </button>
+            ))}
+          </div>
+
+          {/* Recruiter Filter */}
+          <select
+            value={recruiter}
+            onChange={e => setRecruiter(e.target.value)}
+            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white mr-2"
+          >
+            <option value="">All Recruiters</option>
+            {recruiters.map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
+          </select>
+
           <div className="flex gap-1 flex-wrap">
             {DATE_TABS.map(tab => (
               <button
@@ -338,61 +349,66 @@ export function RecruiterDashboard() {
               <option value="">All Companies</option>
               {companies.map(c => <option key={c._id || c.companyName} value={c.companyName}>{c.companyName}</option>)}
             </select>
+            <select
+              value={customer}
+              onChange={e => setCustomer(e.target.value)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white"
+            >
+              <option value="">All Customers</option>
+              {companies.map(c => <option key={`cust-${c._id || c.companyName}`} value={c.companyName}>{c.companyName}</option>)}
+            </select>
             {['admin', 'manager', 'tl'].includes(user?.role || '') && (
-              <select
-                value={recruiter}
-                onChange={e => setRecruiter(e.target.value)}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white"
-              >
-                <option value="">All Recruiters</option>
-                {recruiters.map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
-              </select>
+              <></>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Key Summary Metrics (Req 16 & 20) ── */}
+      {/* ── Top Metrics (4 cards, Today's Calls clickable) ── */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
         </div>
       ) : (
       <>
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Profiles Uploaded Today", value: String(dashData?.metrics?.profilesUploadedToday || 0), change: 'Today', color: 'emerald', icon: UserPlus, slicerKey: 'Today Uploads' },
-          { label: 'Open Requirements', value: String(dashData?.metrics?.openRequirements || 0), change: 'Active JRs', color: 'blue', icon: Briefcase, slicerKey: 'Open Requirements' },
-          { label: 'Eligible Candidates', value: String(dashData?.metrics?.eligibleCount || 0), change: 'Eligible', color: 'amber', icon: UserCheck, slicerKey: 'Eligible Candidates' },
-          { label: 'Final Select', value: String(dashData?.metrics?.finalSelectCount || 0), change: 'L1/Final', color: 'violet', icon: BadgeCheck, slicerKey: '__final_select_group' },
-          { label: 'Waiting for Offer', value: String(dashData?.metrics?.waitingForOfferCount || 0), change: 'Offer/YTJ', color: 'cyan', icon: Clock, slicerKey: '__waiting_for_offer_group' },
-          { label: 'Joined', value: String(dashData?.metrics?.joinedCount || 0), change: 'Placed', color: 'emerald', icon: CheckCircle2, slicerKey: 'Joined' },
+          { label: "Today's Calls", value: String(metrics.todayCalls), change: `+${metrics.todayCalls}`, color: 'blue', icon: Phone, clickable: true },
+          { label: 'Follow-Ups Due', value: String(metrics.followUpsDue), change: 'Urgent', color: 'amber', icon: AlertCircle, clickable: false },
+          { label: 'Interviews Scheduled', value: String(metrics.interviewsScheduled), change: 'This week', color: 'violet', icon: Calendar, clickable: false },
+          { label: 'Resume Inflow', value: String(metrics.resumeInflow), change: `+${metrics.resumeInflow} today`, color: 'emerald', icon: FileText, clickable: false },
         ].map((m, i) => {
           const Icon = m.icon;
-          const c = colorMap[m.color] || colorMap.emerald;
-          const isSelected = activeSlicer === m.slicerKey;
-          return (
-            <button
-              key={i}
-              onClick={() => setActiveSlicer(isSelected ? 'All' : m.slicerKey)}
-              className={`bg-white rounded-xl p-4 border shadow-sm text-left transition-all hover:shadow-md cursor-pointer ${c.card} ${
-                isSelected ? 'ring-2 ring-green-600 shadow-md border-green-400' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${c.icon}`}>
-                  <Icon className="w-3.5 h-3.5" />
+          const c = colorMap[m.color];
+          const content = (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${c.icon}`}>
+                  <Icon className="w-4 h-4" />
                 </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${c.badge}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${c.badge}`} style={{ fontWeight: 500 }}>
                   {m.change}
                 </span>
               </div>
-              <div className="text-slate-800 font-extrabold text-xl leading-tight">{m.value}</div>
-              <div className="text-slate-500 text-xs mt-1 font-medium flex items-center justify-between">
-                <span className="truncate">{m.label}</span>
-                <ArrowRight className="w-3 h-3 text-slate-400 flex-shrink-0 ml-1" />
+              <div className="text-slate-800" style={{ fontWeight: 700, fontSize: '1.75rem' }}>{m.value}</div>
+              <div className="text-slate-500 text-sm mt-0.5 flex items-center gap-1">
+                {m.label}
+                {m.clickable && <ArrowRight className="w-3 h-3 text-green-500 ml-auto" />}
               </div>
+            </>
+          );
+          return m.clickable ? (
+            <button
+              key={i}
+              onClick={goToTodayCalls}
+              className={`bg-white rounded-xl p-5 border shadow-sm text-left transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${c.card}`}
+            >
+              {content}
             </button>
+          ) : (
+            <div key={i} className={`bg-white rounded-xl p-5 border shadow-sm ${c.card}`}>
+              {content}
+            </div>
           );
         })}
       </div>
@@ -412,14 +428,11 @@ export function RecruiterDashboard() {
           {STATUS_CARDS.map((s, i) => {
             const Icon = s.icon;
             const c = STATUS_COLOR_MAP[s.color];
-            const isSelected = activeSlicer === s.label;
             return (
               <div key={i} className="relative">
                 <button
-                  onClick={() => setActiveSlicer(isSelected ? 'All' : s.label)}
-                  className={`w-full flex flex-col items-start p-3.5 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${c.card} ${
-                    isSelected ? 'ring-2 ring-green-600 shadow-md scale-102 border-green-400' : ''
-                  }`}
+                  onClick={() => goToStatus(s.label)}
+                  className={`w-full flex flex-col items-start p-3.5 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${c.card}`}
                 >
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2.5 ${c.icon}`}>
                     <Icon className="w-4 h-4" />
@@ -435,19 +448,122 @@ export function RecruiterDashboard() {
         </div>
       </div>
 
-      {/* In-Place Slicer Filtered Data Section for Recruiter Dashboard */}
-      <SlicerFilteredDataView
-        slicerName={activeSlicer}
-        division={division !== 'All' ? division : undefined}
-        company={company}
-        customer={customer}
-        recruiter={recruiter}
-        range={dateRange}
-        fromDate={customFrom}
-        toDate={customTo}
-        onClear={() => setActiveSlicer('All')}
-        title="Recruiter Pipeline Slicer"
-      />
+      {/* ── Follow-Ups + Quick Actions ── */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Today's Follow-Ups */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-100 shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Today's Follow-Ups</h2>
+              <p className="text-slate-400 text-xs mt-0.5">Scheduled callbacks & pending actions</p>
+            </div>
+            <Link to="/recruiter/resumes" className="text-xs text-green-600 flex items-center gap-1" style={{ fontWeight: 500 }}>
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {followUps.map((f: any, i: number) => (
+              <div key={i} className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-green-700 text-sm" style={{ fontWeight: 600 }}>
+                    {(f.name || f.candidateName || '').split(' ').map((n: string) => n[0]).join('')}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-slate-700 text-sm truncate" style={{ fontWeight: 500 }}>{f.name || f.candidateName}</p>
+                  <p className="text-slate-400 text-xs">{f.skills}</p>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-1 text-slate-400 text-xs mb-1">
+                    <Clock className="w-3 h-3" />
+                    {f.time || f.followUpDate || ''}
+                  </div>
+                  <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full" style={{ fontWeight: 500 }}>
+                    {f.status}
+                  </span>
+                </div>
+                <Link
+                  to={`/recruiter/candidate/${f.candidateId || f._id || '1'}`}
+                  className="ml-2 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 flex-shrink-0"
+                  style={{ fontWeight: 500 }}
+                >
+                  <Phone className="w-3 h-3" />
+                </Link>
+              </div>
+            ))}
+            {followUps.length === 0 && (
+              <div className="px-5 py-8 text-center text-slate-400 text-sm">No follow-ups due</div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Actions + Daily Target */}
+        <div className="space-y-4">
+          
+          {/* Top 2 Open Jobs */}
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Top Open Jobs</h2>
+              <Link to="/admin/jobs" className="text-xs text-green-600 hover:underline">View all</Link>
+            </div>
+            <div className="space-y-3">
+              {topJobs.map(job => (
+                <div key={job._id} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-semibold text-slate-800">{job.jobTitle}</span>
+                    <span className="text-xs text-emerald-600 bg-emerald-100 px-2 rounded-full">{job.positions} open</span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                    <Building2 className="w-3 h-3" /> {job.companyName}
+                  </div>
+                </div>
+              ))}
+              {topJobs.length === 0 && <div className="text-xs text-slate-400 text-center py-2">No open jobs</div>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <h2 className="text-slate-800 text-sm mb-4" style={{ fontWeight: 600 }}>Quick Actions</h2>
+            <div className="space-y-2">
+              {[
+                { label: 'Add New Candidate',  href: '/recruiter/add',          icon: UserPlus,    color: 'text-green-600' },
+                { label: 'Walk-In Queue',       href: '/recruiter/walkin-queue', icon: ListChecks,  color: 'text-emerald-600' },
+                { label: 'Interview Schedule',  href: '/recruiter/interviews',   icon: CalendarCheck, color: 'text-violet-600' },
+                { label: 'ATS Resume Scanner',  href: '/recruiter/scan',         icon: ScanLine,    color: 'text-amber-600' },
+                { label: 'Send Mail',           href: '/email-center',           icon: Mail,        color: 'text-blue-600' },
+                { label: 'View All Resumes',    href: '/recruiter/resumes',      icon: FileText,    color: 'text-slate-600' },
+              ].map((action, i) => {
+                const Icon = action.icon;
+                return (
+                  <Link
+                    key={i}
+                    to={action.href}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors group"
+                  >
+                    <Icon className={`w-4 h-4 ${action.color}`} />
+                    <span className="text-slate-600 text-sm group-hover:text-slate-800">{action.label}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-300 ml-auto group-hover:text-slate-400" />
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Daily Target */}
+          <div className="bg-green-600 rounded-xl p-5 text-white">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4" />
+              <span className="text-sm" style={{ fontWeight: 600 }}>Daily Target</span>
+            </div>
+            <div className="mb-2" style={{ fontWeight: 700, fontSize: '1.5rem' }}>{metrics.todayCalls} / {metrics.dailyTarget}</div>
+            <p className="text-green-200 text-xs mb-3">Calls made today</p>
+            <div className="bg-green-500 rounded-full h-2">
+              <div className="bg-white rounded-full h-2" style={{ width: `${Math.min(100, Math.round((metrics.todayCalls / metrics.dailyTarget) * 100))}%` }} />
+            </div>
+            <p className="text-green-200 text-xs mt-2">{Math.round((metrics.todayCalls / metrics.dailyTarget) * 100)}% of daily target</p>
+          </div>
+        </div>
+      </div>
 
       </>
       )}

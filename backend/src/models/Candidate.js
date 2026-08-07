@@ -1,23 +1,13 @@
 const mongoose = require('mongoose');
 
 const CANDIDATE_STATUSES = [
-  // Official Statuses
-  'Eligible', 'Not Eligible', 'Not Interested', 'No Response', 'Duplicate-Client', 'Call Back',
-  'Hold', 'Submitted To Client', 'Submitted to Client', 'Sublitted To Client', 'Walkin Company', 'Walkin WHM',
-  'No Show', 'VNA Select', 'VNA Reject', 'Test Select', 'Test Reject',
-  'Candidate Drop Post L1 Select', 'Candidate Drop Post L2 Select',
-  'Candidate Drop During Final Stage', 'L1 Select', 'L1 Reject', 'L2 Select',
-  'L2 Reject', 'Final Select', 'Final Reject', 'Document Initialized',
-  'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete',
-  'Waiting for Offer', 'Offer Accept', 'Offer Reject', 'Joined',
-  'Joined and Abort', 'Black List',
-
-  // Legacy Statuses (for backward compatibility)
   'New', 'Contacted', 'Interested', 'Selected for Call', 'Screening',
-  'Interview Scheduled', 'Selected', 'Rejected', 'Eligible Candidates',
-  'Wrong Number', 'Unreachable', 'Did Not Pick', 'Unanswered Calls',
-  'HR Shortlist', 'Written Test', 'Operations Round', 'Document Pending',
-  'Documentation', 'Yet To Join', 'Walk-in Submitted', 'Exited'
+  'Interview Scheduled', 'Selected', 'Rejected',
+  'Eligible Candidates', 'Wrong Number', 'Unreachable',
+  'Did Not Pick', 'Unanswered Calls', 'Call Back',
+  'HR Shortlist', 'Written Test', 'Operations Round',
+  'Document Pending', 'Documentation', 'Yet To Join', 'Joined',
+  'Walk-in Submitted', 'Exited'
 ];
 
 const SOURCES = [
@@ -170,11 +160,9 @@ const candidateSchema = new mongoose.Schema({
   offeredDate: { type: Date },              // Used by AddCandidatePage
   designationOffered: { type: String },     // Used by AddCandidatePage
   joiningSalary: { type: String },          // Used by AddCandidatePage
-  offeredCTC: { type: Number },             // Offered CTC per annum (Integer) for Yet To Join status
   placementPercentage: { type: Number },
   revenueGenerated: { type: Number },
   dateOfJoining: { type: Date },           // Used by AddCandidatePage
-  expectedDateOfJoining: { type: Date },   // Expected joining date for Yet To Join status
 
   // Rejection Reason
   rejectionReason: { type: String },
@@ -190,12 +178,6 @@ const candidateSchema = new mongoose.Schema({
   recruiterChangedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   recruiterChangedAt: { type: Date },
   recruiterChangedByName: { type: String },
-
-  // Last Status Change Audit Record (Req 26)
-  lastStatusChangedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  lastStatusChangedByName: { type: String },
-  lastStatusChangedRole: { type: String },
-  lastStatusChangedAt: { type: Date },
 
   // Assessment tests (up to 6)
   assessmentTests: [{

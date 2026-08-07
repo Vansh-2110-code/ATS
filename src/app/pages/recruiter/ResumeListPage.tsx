@@ -7,20 +7,36 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import { dedupeCompanies } from '../../utils/companyUtils';
-import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS } from '../../utils/candidateStatusUtils';
 
 const API_BASE = window.location.origin;
 
 // ── Extended status list ──────────────────────────────────────
-const STATUS_COLORS: Record<string, string> = CANDIDATE_STATUS_COLORS;
+const STATUS_COLORS: Record<string, string> = {
+  New:                  'bg-slate-100 text-slate-600',
+  Screening:            'bg-sky-100 text-sky-700',
+  Contacted:            'bg-green-100 text-green-700',
+  Interested:           'bg-emerald-100 text-emerald-700',
+  'Interview Scheduled':'bg-violet-100 text-violet-700',
+  Selected:             'bg-teal-100 text-teal-700',
+  Rejected:             'bg-red-100 text-red-600',
+  'Eligible Candidates':'bg-emerald-100 text-emerald-700',
+  'Wrong Number':       'bg-red-100 text-red-600',
+  'Did Not Pick':       'bg-orange-100 text-orange-700',
+  'Call Back':          'bg-amber-100 text-amber-700',
+  'HR Shortlist':       'bg-violet-100 text-violet-700',
+  'Written Test':       'bg-indigo-100 text-indigo-700',
+  'Operations Round':   'bg-cyan-100 text-cyan-700',
+  Documentation:        'bg-sky-100 text-sky-700',
+  'Yet To Join':        'bg-pink-100 text-pink-700',
+  Joined:               'bg-green-100 text-green-700',
+};
 
 // ── Extended source list ──────────────────────────────────────
 const SOURCES = [
   'All Sources', 'Naukri', 'LinkedIn', 'Indeed', 'Referral',
   'Walk-In', 'Shine', 'Facebook', 'Social Media', 'Excel Import'
 ];
-const STATUSES = ['All Status', ...CANDIDATE_STATUS_OPTIONS];
+const STATUSES = ['All Status', ...Object.keys(STATUS_COLORS)];
 
 // ── Location data ─────────────────────────────────────────────
 const CITIES = ['', 'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata', 'Ahmedabad'];
@@ -57,13 +73,11 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const locationState = location.state as { statusFilter?: string; todayCalls?: boolean } | null;
 
   const [search, setSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('All Sources');
   const [statusFilter, setStatusFilter] = useState(() => lockedStatus || locationState?.statusFilter || 'All Status');
-  const [companyFilter, setCompanyFilter] = useState('All Companies');
-  const [divisionFilter, setDivisionFilter] = useState('All Divisions');
-  const [recruiterFilter, setRecruiterFilter] = useState('All Recruiters');
-  const [recruiterList, setRecruiterList] = useState<any[]>([]);
-  const [companyList, setCompanyList] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(true);
+  const [cityFilter, setCityFilter] = useState('');
+  const [localAreaFilter, setLocalAreaFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,20 +98,6 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const [importError, setImportError] = useState('');
   const [multiValueAction, setMultiValueAction] = useState<'clean' | 'keep'>('clean');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-
-  const handleTopScroll = () => {
-    if (topScrollRef.current && tableScrollRef.current) {
-      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
-    }
-  };
-
-  const handleTableScroll = () => {
-    if (topScrollRef.current && tableScrollRef.current) {
-      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
-    }
-  };
 
   // Selection and Bulk Actions state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -151,30 +151,10 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
     }
   };
 
-  // Sync status, company, and division filters from navigation state or URL search params
+  // Sync status filter from navigation state
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const sFilter = params.get('statusFilter') || params.get('status') || locationState?.statusFilter;
-    const cFilter = params.get('clientName') || params.get('company') || params.get('customer');
-    const dFilter = params.get('division');
-
-    if (sFilter) setStatusFilter(sFilter);
-    if (cFilter) setCompanyFilter(cFilter);
-    if (dFilter) setDivisionFilter(dFilter);
-  }, [location.search, locationState?.statusFilter]);
-
-  // Fetch companies for dropdown (ONLY created companies)
-  useEffect(() => {
-    if ((api as any).getCompanyList) {
-      (api as any).getCompanyList()
-        .then((data: any) => {
-          const list = Array.isArray(data) ? data : (data.companies || []);
-          const uniqueSorted = dedupeCompanies(list).map((c: any) => typeof c === 'string' ? c : c.companyName || c.name || '').filter(Boolean);
-          setCompanyList(uniqueSorted as string[]);
-        })
-        .catch(() => {});
-    }
-  }, []);
+    if (locationState?.statusFilter) setStatusFilter(locationState.statusFilter);
+  }, [locationState?.statusFilter]);
 
   // Fetch candidates from API
   useEffect(() => {
@@ -183,6 +163,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
         setLoading(true);
         const params: Record<string, string> = { limit: '1000' };
         if (search) params.search = search;
+        if (sourceFilter !== 'All Sources') params.source = sourceFilter;
         if (statusFilter !== 'All Status') params.status = statusFilter;
         const data = await api.getCandidates(params);
         const list = data.candidates || data || [];
@@ -201,9 +182,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
           recruiter: c.assignedRecruiterName || 'Unassigned',
           phone: c.phone || '',
           positionApplied: c.positionApplied || '',
-          clientName: c.clientName || c.companyName || c.company || '',
-          company: c.clientName || c.companyName || c.company || '',
-          division: c.division || 'BPO',
+          clientName: c.clientName || '',
         })));
       } catch (err) {
         console.error('Failed to load candidates:', err);
@@ -228,9 +207,9 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const buildExportParams = (format: string) => {
     const p: Record<string, string> = { format };
     if (search) p.search = search;
+    if (sourceFilter !== 'All Sources') p.source = sourceFilter;
     if (statusFilter !== 'All Status') p.status = statusFilter;
-    if (companyFilter !== 'All Companies') p.company = companyFilter;
-    if (divisionFilter !== 'All Divisions') p.division = divisionFilter;
+    if (cityFilter) p.city = cityFilter;
     p.limit = '30';
     return p;
   };
@@ -331,6 +310,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
       // Refresh list
       const params: Record<string, string> = { limit: '1000' };
       if (search) params.search = search;
+      if (sourceFilter !== 'All Sources') params.source = sourceFilter;
       if (statusFilter !== 'All Status') params.status = statusFilter;
       const data = await api.getCandidates(params);
       const list = data.candidates || data || [];
@@ -343,9 +323,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
         recruiter: c.assignedRecruiterName || 'Unassigned',
         phone: c.phone || '',
         positionApplied: c.positionApplied || '',
-        clientName: c.clientName || c.companyName || c.company || '',
-        company: c.clientName || c.companyName || c.company || '',
-        division: c.division || 'BPO',
+        clientName: c.clientName || '',
       })));
     } catch (err: any) {
       setImportError(err.message || 'Import failed');
@@ -358,52 +336,26 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
     setVisibleCols(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  useEffect(() => {
-    api.getRecruiters?.()
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : (res?.users || res?.recruiters || []);
-        setRecruiterList(list);
-      })
-      .catch(() => {});
-  }, []);
-
   const filtered = candidates.filter(c => {
     const matchSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.skills.toLowerCase().includes(search.toLowerCase()) ||
-      (c.candidateId && c.candidateId.toLowerCase().includes(search.toLowerCase())) ||
-      (c.phone && c.phone.includes(search));
-
+      c.skills.toLowerCase().includes(search.toLowerCase());
+    const matchSource = sourceFilter === 'All Sources' || c.source === sourceFilter;
     const matchStatus = statusFilter === 'All Status' || c.status === statusFilter;
-
-    const matchCompany =
-      companyFilter === 'All Companies' ||
-      (c.clientName && c.clientName.toLowerCase() === companyFilter.toLowerCase()) ||
-      (c.company && c.company.toLowerCase() === companyFilter.toLowerCase());
-
-    const matchDivision =
-      divisionFilter === 'All Divisions' ||
-      (c.division && c.division.toLowerCase() === divisionFilter.toLowerCase());
-
-    const matchRecruiter =
-      recruiterFilter === 'All Recruiters' ||
-      (c.recruiter && c.recruiter.toLowerCase() === recruiterFilter.toLowerCase()) ||
-      (c.assignedRecruiter && String(c.assignedRecruiter) === recruiterFilter);
-
-    return matchSearch && matchStatus && matchCompany && matchDivision && matchRecruiter;
+    const matchCity = !cityFilter || c.city === cityFilter;
+    const matchArea = !localAreaFilter || c.localArea === localAreaFilter;
+    return matchSearch && matchSource && matchStatus && matchCity && matchArea;
   });
 
   const hasActiveFilters =
-    statusFilter !== 'All Status' ||
-    companyFilter !== 'All Companies' ||
-    divisionFilter !== 'All Divisions' ||
-    recruiterFilter !== 'All Recruiters';
+    sourceFilter !== 'All Sources' || statusFilter !== 'All Status' ||
+    !!cityFilter || !!localAreaFilter;
 
   const clearAll = () => {
+    setSourceFilter('All Sources');
     setStatusFilter('All Status');
-    setCompanyFilter('All Companies');
-    setDivisionFilter('All Divisions');
-    setRecruiterFilter('All Recruiters');
+    setCityFilter('');
+    setLocalAreaFilter('');
   };
 
   const visibleCount = Object.values(visibleCols).filter(Boolean).length;
@@ -691,7 +643,19 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
 
         {/* Expanded Filters */}
         {showFilters && (
-          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-4 items-center">
+          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-3 items-center">
+            {/* Source */}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Source</label>
+              <select
+                value={sourceFilter}
+                onChange={e => setSourceFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
+              >
+                {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
             {/* Status (Hidden if locked) */}
             {!lockedStatus && (
               <div>
@@ -699,57 +663,39 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                 <select
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-40"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
                 >
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             )}
 
-            {/* Company */}
+            {/* City */}
             <div>
-              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Company</label>
+              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>City</label>
               <select
-                value={companyFilter}
-                onChange={e => setCompanyFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-44"
+                value={cityFilter}
+                onChange={e => { setCityFilter(e.target.value); setLocalAreaFilter(''); }}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
               >
-                <option value="All Companies">All Companies</option>
-                {dedupeCompanies(companyList).map(comp => {
-                  const val = typeof comp === 'string' ? comp : comp.companyName;
-                  return <option key={val} value={val}>{val}</option>;
-                })}
+                <option value="">All Cities</option>
+                {CITIES.filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
-            {/* Division */}
+            {/* Local Area */}
             <div>
-              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Division</label>
+              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Local Area</label>
               <select
-                value={divisionFilter}
-                onChange={e => setDivisionFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-36"
+                value={localAreaFilter}
+                onChange={e => setLocalAreaFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
+                disabled={!cityFilter}
               >
-                <option value="All Divisions">All Divisions</option>
-                <option value="BPO">BPO</option>
-                <option value="IT">IT</option>
-                <option value="Lateral">Lateral</option>
-              </select>
-            </div>
-
-            {/* Recruiter (Req 24 & 25) */}
-            <div>
-              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Recruiter</label>
-              <select
-                value={recruiterFilter}
-                onChange={e => setRecruiterFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-44"
-              >
-                <option value="All Recruiters">All Recruiters</option>
-                {recruiterList.map((r: any) => {
-                  const rName = r.name || r.userName || r.email || r;
-                  return <option key={r._id || rName} value={rName}>{rName}</option>;
-                })}
+                <option value="">All Areas</option>
+                {(LOCAL_AREAS[cityFilter] ?? []).filter(Boolean).map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
               </select>
             </div>
 
@@ -791,31 +737,11 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-        {/* Top Horizontal Scrollbar Bar */}
-        <div className="hidden md:flex items-center justify-between px-4 py-2 bg-slate-100/90 border-b border-slate-200 text-xs text-slate-600 font-medium">
-          <div className="flex items-center gap-1.5 flex-shrink-0 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span>Top Scrollbar</span>
-          </div>
-          <div
-            ref={topScrollRef}
-            onScroll={handleTopScroll}
-            className="overflow-x-auto max-w-full flex-1 ml-4 py-0.5 cursor-pointer"
-            style={{ scrollbarWidth: 'auto' }}
-          >
-            <div style={{ width: '1400px', height: '1px' }} />
-          </div>
-        </div>
-
-        {/* Desktop Table Container */}
-        <div
-          ref={tableScrollRef}
-          onScroll={handleTableScroll}
-          className="hidden md:block overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto"
-        >
-          <table className="w-full border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-50 shadow-xs">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full">
+            <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="px-5 py-3 text-left w-10">
                   <input

@@ -9,8 +9,6 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { calculateAge } from '../../utils/ageCalculator';
-import { dedupeCompanies } from '../../utils/companyUtils';
-import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS, isTLOnlyStatus } from '../../utils/candidateStatusUtils';
 
 const API_BASE = window.location.origin;
 
@@ -23,8 +21,38 @@ const EMAIL_TEMPLATES = [
   { value: 'offer_letter',            label: 'Letter for Initial Job Offer' },
 ];
 
-const STATUS_OPTIONS = [...CANDIDATE_STATUS_OPTIONS];
-const STATUS_COLORS: Record<string, string> = CANDIDATE_STATUS_COLORS;
+const STATUS_OPTIONS = [
+  'New', 'Contacted', 'Interested', 'Selected for Call', 'Screening',
+  'Interview Scheduled', 'Selected', 'Rejected',
+  'Eligible Candidates', 'Wrong Number', 'Unreachable',
+  'Did Not Pick', 'Unanswered Calls', 'Call Back',
+  'HR Shortlist', 'Written Test', 'Operations Round',
+  'Document Pending', 'Documentation', 'Yet To Join', 'Joined', 'Exited',
+];
+const STATUS_COLORS: Record<string, string> = {
+  New: 'bg-slate-100 text-slate-600 border-slate-200',
+  Contacted: 'bg-green-100 text-green-700 border-green-200',
+  Interested: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'Selected for Call': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  Screening: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  'Interview Scheduled': 'bg-violet-100 text-violet-700 border-violet-200',
+  Selected: 'bg-teal-100 text-teal-700 border-teal-200',
+  Rejected: 'bg-red-100 text-red-600 border-red-200',
+  'Eligible Candidates': 'bg-green-100 text-green-700 border-green-200',
+  'Wrong Number': 'bg-orange-100 text-orange-700 border-orange-200',
+  Unreachable: 'bg-orange-100 text-orange-700 border-orange-200',
+  'Did Not Pick': 'bg-amber-100 text-amber-700 border-amber-200',
+  'Unanswered Calls': 'bg-amber-100 text-amber-700 border-amber-200',
+  'Call Back': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  'HR Shortlist': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  'Written Test': 'bg-blue-100 text-blue-700 border-blue-200',
+  'Operations Round': 'bg-sky-100 text-sky-700 border-sky-200',
+  'Document Pending': 'bg-rose-100 text-rose-700 border-rose-200',
+  Documentation: 'bg-rose-100 text-rose-700 border-rose-200',
+  'Yet To Join': 'bg-purple-100 text-purple-700 border-purple-200',
+  Joined: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  Exited: 'bg-red-100 text-red-700 border-red-200',
+};
 
 const OWNERSHIP_STATUS_COLORS: Record<string, string> = {
   'Assigned': 'bg-green-50 text-green-700 border-green-200',
@@ -159,10 +187,10 @@ export function CandidateProfilePage() {
 
   // ── Lock state ───────────────────────────────────────────────
   const isBlockedAsDuplicate = candidate?.isDuplicate && !isAdmin;
-  const isLockedForRecruiter = false; // Recruiters can edit/update candidate status until status is Joined
-  const isLockedForTL = false;
-  const isLockedForAll = false;
-  const isLockedForManager = false;
+  const isLockedForRecruiter = candidate?.firstCallSubmitted && isRecruiter;
+  const isLockedForTL = false; // TL can edit now
+  const isLockedForAll = candidate?.tlCallSubmitted && !isAdmin;
+  const isLockedForManager = false; // Managers can edit now
   const isInactive = candidate?.candidateActiveStatus === 'Inactive';
   const isFinalInterviewLocked = candidate?.finalInterviewLocked && !isAdmin;
 
@@ -185,7 +213,6 @@ export function CandidateProfilePage() {
 
   // ── Joining Details state ──────────────────────────────────
   const [joiningDate, setJoiningDate] = useState('');
-  const [expectedJoiningDate, setExpectedJoiningDate] = useState('');
   const [joiningSalary, setJoiningSalary] = useState('');
   const [joiningDesignation, setJoiningDesignation] = useState('');
   const [offeredCTC, setOfferedCTC] = useState<number>(0);
@@ -237,7 +264,6 @@ export function CandidateProfilePage() {
         setFinalIntStatus(c.finalInterviewStatus || '');
 
         // Pre-fill joining details
-        if (c.expectedDateOfJoining) setExpectedJoiningDate(new Date(c.expectedDateOfJoining).toISOString().split('T')[0]);
         if (c.offerDetails?.dateOfJoining) setJoiningDate(new Date(c.offerDetails.dateOfJoining).toISOString().split('T')[0]);
         if (c.offerDetails?.joiningSalary) setJoiningSalary(c.offerDetails.joiningSalary);
         if (c.offerDetails?.designationOffered) setJoiningDesignation(c.offerDetails.designationOffered);
@@ -258,8 +284,7 @@ export function CandidateProfilePage() {
     const shouldFetchUsers = (isAdmin && reassignOpen) || (isTLOrAdmin && tagOpen);
     if (shouldFetchUsers || showJoiningModal || isAdmin) {
       api.getCompanies().then(d => {
-        const rawComps = Array.isArray(d) ? d : (d.companies || []);
-        setCompanies(dedupeCompanies(rawComps));
+        setCompanies(d.companies || []);
         if (shouldFetchUsers) {
           api.getUsers().then(du => setRecruiters(du.users?.filter((u: any) => ['recruiter', 'tl'].includes(u.role)) || [])).catch(() => {});
         }
@@ -283,20 +308,10 @@ export function CandidateProfilePage() {
   }, [id]);
 
   const handleStatusUpdate = async (newStatus: string) => {
-    if (isBlockedAsDuplicate) return;
-    
-    if (isTLOnlyStatus(newStatus) && !isTLOrAdmin) {
-      alert(`Status "${newStatus}" can only be updated by Team Leaders, Managers, or Admins.`);
-      return;
-    }
+    if (isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) return;
     
     if (newStatus === 'Joined') {
       setShowJoiningModal(true);
-      return;
-    }
-
-    if (candidate?.status === 'Joined' && newStatus !== 'Joined') {
-      alert('Candidate status is "Joined" and cannot be changed back to any other status.');
       return;
     }
 
@@ -306,14 +321,7 @@ export function CandidateProfilePage() {
     }
 
     try {
-      await api.updateCandidateStatus(id!, newStatus, expectedJoiningDate || undefined, joiningSalary || undefined);
-      if (newStatus === 'Yet To Join') {
-        await api.updateCandidate(id!, {
-          expectedDateOfJoining: expectedJoiningDate || undefined,
-          joiningSalary: joiningSalary || undefined,
-          offeredCTC: joiningSalary || undefined
-        });
-      }
+      await api.updateCandidateStatus(id!, newStatus);
       setStatus(newStatus);
     } catch (err) {
       console.error('Failed to update status:', err);
@@ -942,6 +950,296 @@ export function CandidateProfilePage() {
             </div>
           </div>
 
+          {/* ── First Call Status Section (Recruiter Editable) ─────────── */}
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
+            <button onClick={() => setFirstCallOpen(o => !o)} className="w-full flex items-center justify-between px-6 py-4 text-left">
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-amber-600" />
+                <span className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>First Call Status</span>
+                {candidate.firstCallSubmitted && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Submitted
+                  </span>
+                )}
+              </div>
+              {firstCallOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            </button>
+
+            {firstCallOpen && (
+              <div className="px-6 pb-6 border-t border-slate-100 pt-4 space-y-4">
+                <div className="mb-4 bg-amber-50/50 p-4 rounded-xl border border-amber-100">
+                  <label className="block text-sm text-slate-800 mb-3" style={{ fontWeight: 600 }}>
+                    Have you spoken to the candidate?
+                  </label>
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="fcContacted" checked={fcContacted}
+                        onChange={() => {
+                          setFcContacted(true);
+                          if (!fcDate) setFcDate(new Date().toISOString().split('T')[0]);
+                          if (!fcTime) setFcTime(new Date().toTimeString().slice(0, 5));
+                        }}
+                        disabled={candidate.firstCallSubmitted && !isAdmin}
+                        className="w-4 h-4 text-amber-600 focus:ring-amber-500 border-slate-300" />
+                      <span className="text-sm text-slate-700" style={{ fontWeight: 500 }}>Yes</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="fcContacted" checked={!fcContacted}
+                        onChange={() => setFcContacted(false)}
+                        disabled={candidate.firstCallSubmitted && !isAdmin}
+                        className="w-4 h-4 text-slate-400 focus:ring-amber-500 border-slate-300" />
+                      <span className="text-sm text-slate-700" style={{ fontWeight: 500 }}>No</span>
+                    </label>
+                  </div>
+                </div>
+
+                <fieldset disabled={(candidate.firstCallSubmitted && !isAdmin) || !fcContacted} className={`space-y-4 ${((candidate.firstCallSubmitted && !isAdmin) || !fcContacted) ? 'opacity-50 cursor-not-allowed select-none' : ''}`}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>First Call Status *</label>
+                      <select value={fcStatus} onChange={e => setFcStatus(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50">
+                        <option value="">— Select Status —</option>
+                        {['No response', 'Not reachable', 'Call back scheduled', 'Screening in Progress', 'Eligible', 'SPOC Shortlisted', 'Rejected – Communication', 'Rejected – Experience Mismatch', 'Rejected – Salary Mismatch', 'Rejected – Location Constraint', 'Rejected – Notice Period', 'On Hold', 'Duplicate Profile', 'Not Interested', 'Interview Scheduled', 'Interview Completed', 'Selected', 'Offer Released', 'Offer Accepted', 'Offer Declined', 'Joined', 'Other'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    {fcStatus === 'Other' && (
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Specify Reason</label>
+                        <input type="text" value={fcOtherReason} onChange={e => setFcOtherReason(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Communication Rating</label>
+                      <select value={fcRating} onChange={e => setFcRating(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50">
+                        <option value="">— Select —</option>
+                        {['Excellent', 'Good', 'Average', 'Poor', 'None'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Candidate Email</label>
+                      <input type="email" value={fcEmail} onChange={e => setFcEmail(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Interview Type</label>
+                      <select value={fcInterviewType} onChange={e => setFcInterviewType(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50">
+                        <option value="">— Select —</option>
+                        {['Virtual', 'Walk-in Company', 'Walk-in WHM', 'Video Call', 'Phone Call', 'Face2Face'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Eligible Role</label>
+                      <input type="text" value={fcEligibleRole} onChange={e => setFcEligibleRole(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Call Back</label>
+                      <input type="datetime-local" value={fcCallBack} onChange={e => setFcCallBack(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>First Call Date</label>
+                      <input type="date" value={fcDate} onChange={e => setFcDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>First Call Time</label>
+                      <input type="time" value={fcTime} onChange={e => setFcTime(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Comments</label>
+                      <textarea value={fcComments} onChange={e => setFcComments(e.target.value)} rows={2}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-amber-400 disabled:bg-slate-50 resize-none" />
+                    </div>
+                  </div>
+                  {firstCallError && <p className="text-red-600 text-xs mt-2">{firstCallError}</p>}
+                  {(!candidate.firstCallSubmitted || isAdmin) && (
+                    <div className="flex justify-end mt-4">
+                      <button onClick={handleSaveFirstCall} disabled={savingFirstCall}
+                        className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                        style={{ fontWeight: 600 }}>
+                        {savingFirstCall ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        {candidate.firstCallSubmitted ? 'Update (Admin)' : 'Submit First Call'}
+                      </button>
+                    </div>
+                  )}
+                </fieldset>
+              </div>
+            )}
+          </div>
+
+          {/* ── Candidate Final Details Section (Recruiter Editable) ─────────── */}
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
+            <button onClick={() => setFinalDetailsOpen(o => !o)} className="w-full flex items-center justify-between px-6 py-4 text-left">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-blue-600" />
+                <span className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Candidate Final Details</span>
+                {candidate.finalDetailsSubmitted && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Submitted
+                  </span>
+                )}
+              </div>
+              {finalDetailsOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            </button>
+
+            {finalDetailsOpen && (
+              <div className="px-6 pb-6 border-t border-slate-100 pt-4 space-y-4">
+                <fieldset disabled={(candidate.finalDetailsSubmitted && !isAdmin) || !fcContacted} className={`space-y-4 ${((candidate.finalDetailsSubmitted && !isAdmin) || !fcContacted) ? 'opacity-70 cursor-not-allowed select-none' : ''}`}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Age</label>
+                      <input type="text" value={fcCandidateAge} onChange={e => setFcCandidateAge(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-400 disabled:bg-slate-50" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Recruiter Status</label>
+                      <select value={fcRecruiterStatus} onChange={e => setFcRecruiterStatus(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-400 disabled:bg-slate-50">
+                        <option value="">— Select —</option>
+                        {['Eligible', 'Not Eligible', 'Hold'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Walk-In Schedule</label>
+                      <input type="date" value={fcWalkInSchedule} onChange={e => setFcWalkInSchedule(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-400 disabled:bg-slate-50" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Tentative DOJ</label>
+                      <input type="date" value={fcTentativeDOJ} onChange={e => setFcTentativeDOJ(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-400 disabled:bg-slate-50" />
+                    </div>
+                  </div>
+                  {finalDetailsError && <p className="text-red-600 text-xs mt-2">{finalDetailsError}</p>}
+                  {(!candidate.finalDetailsSubmitted || isAdmin) && (
+                    <div className="flex justify-end mt-4">
+                      <button onClick={handleSaveFinalDetails} disabled={savingFinalDetails}
+                        className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        style={{ fontWeight: 600 }}>
+                        {savingFinalDetails ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        {candidate.finalDetailsSubmitted ? 'Update (Admin)' : 'Submit Final Details'}
+                      </button>
+                    </div>
+                  )}
+                </fieldset>
+              </div>
+            )}
+          </div>
+
+          {/* ── TL: Second Call Section ──────────────────────────── */}
+          {isTLOrAdmin && (
+            <div className={`bg-white rounded-xl border shadow-sm ${candidate.tlCallSubmitted && !isAdmin ? 'border-slate-200 opacity-75' : 'border-violet-200'}`}>
+              <button
+                onClick={() => setSecondCallOpen(o => !o)}
+                disabled={candidate.tlCallSubmitted && !isAdmin}
+                className="w-full flex items-center justify-between px-6 py-4 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-violet-600" />
+                  <span className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>
+                    Second Call Status {isTL ? '(Team Leader)' : ''}
+                  </span>
+                  {candidate.tlCallSubmitted && (
+                    <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full ml-1" style={{ fontWeight: 500 }}>
+                      <Lock className="w-3 h-3 inline mr-0.5" />Submitted & Locked
+                    </span>
+                  )}
+                  {!candidate.tlCallSubmitted && candidate.firstCallSubmitted && (
+                    <span className="text-xs px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full ml-1" style={{ fontWeight: 500 }}>Ready for TL</span>
+                  )}
+                </div>
+                {secondCallOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+              </button>
+
+              {secondCallOpen && (
+                <div className="px-6 pb-6 space-y-4 border-t border-slate-100 pt-4">
+                  {(!candidate.firstCallSubmitted && !isAdmin) && (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+                      <AlertTriangle className="w-4 h-4" />
+                      First call must be submitted before TL can fill second call.
+                    </div>
+                  )}
+
+                  {/* Read-only view of all other fields for TL */}
+                  {isTL && (
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-500 space-y-1">
+                      <p className="font-semibold text-slate-600 mb-2">Candidate Info (Read-Only)</p>
+                      <p>Name: <span className="text-slate-700">{candidate.name}</span></p>
+                      <p>Phone: <span className="text-slate-700">{candidate.phone}</span></p>
+                      <p>First Call Status: <span className="text-slate-700">{candidate.firstCallStatus || 'N/A'}</span></p>
+                      <p>First Call Date: <span className="text-slate-700">{candidate.firstCallDate ? new Date(candidate.firstCallDate).toLocaleDateString() : 'N/A'}</span></p>
+                      <p>Current Status: <span className="text-slate-700">{candidate.status}</span></p>
+                    </div>
+                  )}
+
+                  <div className={candidate.tlCallSubmitted && !isAdmin ? 'pointer-events-none opacity-60' : ''}>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Second Call Status *</label>
+                        <select
+                          value={secondCallStatus}
+                          onChange={e => setSecondCallStatus(e.target.value)}
+                          disabled={candidate.tlCallSubmitted && !isAdmin}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-violet-400 disabled:bg-slate-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">— Select Status —</option>
+                          {SECOND_CALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Call Date</label>
+                        <input type="date" value={secondCallDate} onChange={e => setSecondCallDate(e.target.value)}
+                          disabled={candidate.tlCallSubmitted && !isAdmin}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-violet-400 disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Call Time</label>
+                        <input type="time" value={secondCallTime} onChange={e => setSecondCallTime(e.target.value)}
+                          disabled={candidate.tlCallSubmitted && !isAdmin}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-violet-400 disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Candidate Email</label>
+                        <input type="email" value={secondCallEmail} onChange={e => setSecondCallEmail(e.target.value)}
+                          placeholder="Confirm candidate email"
+                          disabled={candidate.tlCallSubmitted && !isAdmin}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-violet-400 disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>Notes / Observations</label>
+                        <textarea value={secondCallNotes} onChange={e => setSecondCallNotes(e.target.value)} rows={3}
+                          placeholder="TL notes after second call..."
+                          disabled={candidate.tlCallSubmitted && !isAdmin}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-violet-400 resize-none disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                      </div>
+                    </div>
+
+                    {secondCallError && (
+                      <p className="text-red-600 text-xs mt-2">{secondCallError}</p>
+                    )}
+
+                    {!(candidate.tlCallSubmitted && !isAdmin) && (
+                      <div className="flex justify-end mt-4">
+                        <button onClick={handleSecondCallSubmit} disabled={submittingSecondCall}
+                          className="flex items-center gap-2 px-5 py-2 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                          style={{ fontWeight: 600 }}>
+                          {submittingSecondCall ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
+                          {candidate.tlCallSubmitted ? 'Update Second Call (Admin)' : 'Submit & Lock Second Call'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Notes */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
             <h2 className="text-slate-800 text-sm mb-4" style={{ fontWeight: 600 }}>Notes & Follow-Up</h2>
@@ -956,8 +1254,8 @@ export function CandidateProfilePage() {
                 </div>
               ))}
             </div>
-            {/* Only allow notes if not duplicate */}
-            {!isBlockedAsDuplicate && (
+            {/* Only allow notes if not locked */}
+            {!isLockedForAll && !isLockedForRecruiter && !isLockedForTL && !isBlockedAsDuplicate && !isLockedForManager && (
               <div className="space-y-3">
                 <textarea value={note} onChange={e => setNote(e.target.value)}
                   placeholder="Add a note..." rows={2}
@@ -972,10 +1270,18 @@ export function CandidateProfilePage() {
                 </div>
               </div>
             )}
-            {isBlockedAsDuplicate && (
+            {isLockedForTL && !isLockedForAll && (
               <p className="text-slate-400 text-xs text-center py-2 flex items-center justify-center gap-1">
-                <Lock className="w-3 h-3 text-emerald-600" /> Notes are disabled — duplicate profile.
+                <Lock className="w-3 h-3" /> Notes are view-only — use Second Call section for observations.
               </p>
+            )}
+            {isLockedForRecruiter && !isLockedForAll && (
+              <p className="text-slate-400 text-xs text-center py-2 flex items-center justify-center gap-1">
+                <Lock className="w-3 h-3" /> Notes are view-only — profile locked after first call submission.
+              </p>
+            )}
+            {isLockedForAll && (
+              <p className="text-slate-400 text-xs text-center py-2">Notes are view-only. Profile is fully locked.</p>
             )}
           </div>
 
@@ -1005,7 +1311,105 @@ export function CandidateProfilePage() {
             </div>
           </div>
 
+          {/* ── Interview Status Section ──────────────────────────── */}
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
+            <button onClick={() => setInterviewStatusOpen(o => !o)} className="w-full flex items-center justify-between px-6 py-4 text-left">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-violet-600" />
+                <span className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Interview Status</span>
+                {candidate.interviewStatus && (
+                  <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{candidate.interviewStatus}</span>
+                )}
+                {candidate.finalInterviewLocked && (
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Final Locked
+                  </span>
+                )}
+              </div>
+              {interviewStatusOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            </button>
 
+            {interviewStatusOpen && (
+              <div className="px-6 pb-6 border-t border-slate-100 pt-4 space-y-4">
+                {/* Lock banner */}
+                {isFinalInterviewLocked && (
+                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <Lock className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-700 text-sm">Final Interview Status is locked. Only Admin can change it.</p>
+                  </div>
+                )}
+
+                {/* Interview Status — Recruiter / TL / Admin */}
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1.5" style={{ fontWeight: 500 }}>
+                    Interview Status <span className="text-slate-400">(Recruiter / TL / Admin)</span>
+                  </label>
+                  <select value={intStatus} onChange={e => setIntStatus(e.target.value)}
+                    disabled={isLockedForAll || isLockedForRecruiter || isFinalInterviewLocked}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${isLockedForAll || isLockedForRecruiter || isFinalInterviewLocked ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-200 focus:border-violet-400'}`}>
+                    <option value="">— Select status —</option>
+                    {['Interview Scheduled','Interview Rescheduled','Interview Completed','Interview Feedback Pending','Shortlisted','Rejected – Interview Round','On Hold','HR Round Scheduled'].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Final Round Status — TL / Admin only */}
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1.5 flex items-center gap-1" style={{ fontWeight: 500 }}>
+                    <Shield className="w-3 h-3 text-violet-500" />
+                    Final Round Status <span className="text-violet-500">(TL / Admin only)</span>
+                  </label>
+                  <select value={finalRoundStatus} onChange={e => setFinalRoundStatus(e.target.value)}
+                    disabled={!isTLOrAdmin || isLockedForAll || isFinalInterviewLocked}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${!isTLOrAdmin || isLockedForAll || isFinalInterviewLocked ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'border-violet-200 focus:border-violet-400'}`}>
+                    <option value="">— Select —</option>
+                    <option value="Final Round Scheduled">Final Round Scheduled</option>
+                  </select>
+                  {!isTLOrAdmin && <p className="mt-1 text-xs text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> TL or Admin only</p>}
+                </div>
+
+                {/* Final Interview Status — TL (initial) / Admin (after lock) */}
+                <div className={`rounded-xl border p-4 ${isFinalInterviewLocked && isAdmin ? 'border-green-200 bg-green-50/40' : isFinalInterviewLocked ? 'border-red-200 bg-red-50/40' : isTLOrAdmin ? 'border-violet-200 bg-violet-50/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-sm mb-1 flex items-center gap-1.5" style={{ fontWeight: 600, color: isTLOrAdmin ? '#4c1d95' : '#475569' }}>
+                    <Lock className="w-4 h-4" />Final Interview Status
+                    {isFinalInterviewLocked
+                      ? isAdmin
+                        ? <span className="text-xs text-green-600 font-normal ml-1">(Locked — Admin override)</span>
+                        : <span className="text-xs text-red-500 font-normal ml-1">(Locked — Admin only)</span>
+                      : isTLOrAdmin
+                        ? <span className="text-xs text-violet-600 font-normal ml-1">(TL / Admin — will lock on save)</span>
+                        : <span className="text-xs text-slate-400 font-normal ml-1">(TL / Admin only)</span>
+                    }
+                  </p>
+                  <p className="text-xs text-slate-400 mb-3">
+                    {isFinalInterviewLocked ? 'This status is locked after submission.' : 'Setting this will lock it — only Admin can change it afterward.'}
+                  </p>
+                  <select value={finalIntStatus} onChange={e => setFinalIntStatus(e.target.value)}
+                    disabled={!isTLOrAdmin || (isFinalInterviewLocked && !isAdmin)}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${
+                      (!isTLOrAdmin || (isFinalInterviewLocked && !isAdmin))
+                        ? 'bg-white border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'border-violet-300 focus:border-violet-500 bg-white'
+                    }`}>
+                    <option value="">Select final status</option>
+                    {['Selected', 'Rejected', 'On Hold'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                {/* Save button */}
+                {intStatusMsg && (
+                  <p className={`text-xs ${intStatusMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{intStatusMsg.text}</p>
+                )}
+                <button onClick={handleSaveInterviewStatus} disabled={savingIntStatus || isLockedForAll || isLockedForRecruiter || isFinalInterviewLocked}
+                  className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                  style={{ fontWeight: 500 }}>
+                  {savingIntStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Save Interview Status
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* ── Documentation Section (Admin only) ──────────────── */}
           {isAdmin && (
@@ -1279,98 +1683,25 @@ export function CandidateProfilePage() {
           {/* Status Update */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
             <h3 className="text-slate-700 text-sm mb-2" style={{ fontWeight: 600 }}>Update Status</h3>
-            {(candidate?.status === 'Joined' || isBlockedAsDuplicate) && (
+            {(isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) && (
               <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
-                <Lock className="w-3 h-3 text-emerald-600" /> {candidate?.status === 'Joined' ? 'Locked — Candidate status is Joined' : 'Locked — duplicate profile'}
+                <Lock className="w-3 h-3" /> {isLockedForManager ? 'Read-only access' : isLockedForAll ? 'Locked — Admin only' : isBlockedAsDuplicate ? 'Locked — duplicate profile' : isLockedForTL ? 'TL view only — use Second Call section' : 'Locked after first call'}
               </p>
             )}
-            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-              {STATUS_OPTIONS.map(s => {
-                const tlOnly = isTLOnlyStatus(s);
-                const isDisabled = isBlockedAsDuplicate || 
-                  (candidate?.status === 'Joined' && s !== 'Joined') ||
-                  (tlOnly && !isTLOrAdmin);
-
-                return (
-                  <button key={s} onClick={() => handleStatusUpdate(s)}
-                    disabled={isDisabled}
-                    title={tlOnly && !isTLOrAdmin ? 'Restricted — Only Team Leaders, Managers, and Admins can set this status' : ''}
-                    className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                      status === s
-                        ? (STATUS_COLORS[s] || 'bg-slate-100 text-slate-600 border-slate-200') + ' border'
-                        : 'border-slate-100 hover:bg-slate-50 text-slate-600'
-                    }`} style={{ fontWeight: status === s ? 600 : 400 }}>
-                    <span className="flex items-center gap-1.5">
-                      {s}
-                      {tlOnly && <Lock className="w-3 h-3 text-amber-500 inline ml-1" title="TL / Manager / Admin only" />}
-                    </span>
-                    {status === s && <CheckCircle2 className="w-4 h-4" />}
-                  </button>
-                );
-              })}
+            <div className="space-y-2">
+              {STATUS_OPTIONS.map(s => (
+                <button key={s} onClick={() => handleStatusUpdate(s)}
+                  disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager}
+                  className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    status === s
+                      ? (STATUS_COLORS[s] || 'bg-slate-100 text-slate-600 border-slate-200') + ' border'
+                      : 'border-slate-100 hover:bg-slate-50 text-slate-600'
+                  }`} style={{ fontWeight: status === s ? 600 : 400 }}>
+                  {s}
+                  {status === s && <CheckCircle2 className="w-4 h-4" />}
+                </button>
+              ))}
             </div>
-
-            {/* Expected Joining Date & Offered CTC — appears when Yet To Join is selected */}
-            {status === 'Yet To Join' && (
-              <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1.5">
-                    Expected Joining Date
-                  </label>
-                  <input
-                    type="date"
-                    value={expectedJoiningDate || (candidate?.expectedDateOfJoining ? new Date(candidate.expectedDateOfJoining).toISOString().slice(0, 10) : '')}
-                    onChange={async e => {
-                      const val = e.target.value;
-                      setExpectedJoiningDate(val);
-                      if (val && id) {
-                        try {
-                          await api.updateCandidate(id, { expectedDateOfJoining: val });
-                        } catch (err) {
-                          console.error('Failed to save expected joining date:', err);
-                        }
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm outline-none focus:border-purple-400 bg-purple-50/40"
-                  />
-                  {(expectedJoiningDate || candidate?.expectedDateOfJoining) && (
-                    <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">
-                      ✓ Joining expected on {new Date(expectedJoiningDate || candidate?.expectedDateOfJoining).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1.5">
-                    Offered CTC (Per Annum - Integer Only)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="e.g. 650000"
-                    value={joiningSalary ? String(joiningSalary).replace(/\D/g, '') : (candidate?.offeredCTC ? String(candidate.offeredCTC) : (candidate?.joiningSalary ? String(candidate.joiningSalary).replace(/\D/g, '') : ''))}
-                    onChange={async e => {
-                      const digitsOnly = e.target.value.replace(/\D/g, '');
-                      setJoiningSalary(digitsOnly);
-                      if (digitsOnly && id) {
-                        try {
-                          await api.updateCandidate(id, { joiningSalary: digitsOnly, offeredCTC: parseInt(digitsOnly, 10) || 0 });
-                        } catch (err) {
-                          console.error('Failed to save offered CTC:', err);
-                        }
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm outline-none focus:border-purple-400 bg-purple-50/40 font-mono"
-                  />
-                  {(joiningSalary || candidate?.offeredCTC || candidate?.joiningSalary) && (
-                    <p className="text-xs text-purple-600 mt-1 flex items-center gap-1 font-semibold">
-                      ✓ Offered CTC: ₹{parseInt(String(joiningSalary || candidate?.offeredCTC || candidate?.joiningSalary).replace(/\D/g, ''), 10).toLocaleString('en-IN')} / annum
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Schedule Interview */}

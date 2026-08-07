@@ -4,11 +4,9 @@ import {
   Search, Briefcase, Plus, Edit2, Trash2, RefreshCw,
   X, ChevronLeft, ChevronRight, Building2, Users, AlertCircle,
   Eye, Phone, MapPin, UserCheck, Tag, UserPlus, Lock,
-  Copy, Check, FileText,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { dedupeCompanies } from '../../utils/companyUtils';
 
 const STATUS_COLORS: Record<string, string> = {
   Open: 'bg-emerald-100 text-emerald-700',
@@ -26,37 +24,21 @@ export function JobsListPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const canCreate = ['admin', 'manager', 'tl'].includes(user?.role || '');
-  const canEdit = ['admin', 'manager', 'tl'].includes(user?.role || '');
-  const canDelete = ['admin', 'manager'].includes(user?.role || '');
-  const searchParams = new URLSearchParams(location.search);
-  const urlCompany = searchParams.get('company') || searchParams.get('customer') || (location.state as any)?.company || '';
-  const urlStatus = searchParams.get('status') || '';
-  const urlDivision = searchParams.get('division') || '';
+  const companyFilter = (location.state as any)?.company as string | undefined;
+
+  const canCreate = ['tl', 'admin', 'manager'].includes(user?.role || '');
+  const canEdit = ['admin', 'manager'].includes(user?.role || '');
+  const canDelete = user?.role === 'admin';
 
   const [jobs, setJobs] = useState<any[]>([]);
   const [companiesList, setCompaniesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState(urlStatus);
-  const [companyQ, setCompanyQ] = useState(urlCompany);
-  const [divisionQ, setDivisionQ] = useState(urlDivision);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [companyQ, setCompanyQ] = useState(companyFilter || '');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
   const [stats, setStats] = useState({ open: 0, closed: 0, onHold: 0 });
-
-  // Sync URL search params when navigation changes
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const c = params.get('company') || params.get('customer') || '';
-    const s = params.get('status') || '';
-    const d = params.get('division') || '';
-
-    if (c) setCompanyQ(c);
-    if (s) setStatusFilter(s);
-    if (d) setDivisionQ(d);
-  }, [location.search]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editJob, setEditJob] = useState<any>(null);
@@ -76,10 +58,6 @@ export function JobsListPage() {
   const [referring, setReferring] = useState<string | null>(null);
   const [referDone, setReferDone] = useState<string[]>([]);
 
-  // View JR & Job Description modal state
-  const [viewJdJob, setViewJdJob] = useState<any | null>(null);
-  const [copiedJdId, setCopiedJdId] = useState<string | null>(null);
-
   const openCandidatePanel = async (job: any) => {
     setCandidatePanel({ job, candidates: [], loading: true });
     try {
@@ -97,7 +75,6 @@ export function JobsListPage() {
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
       if (companyQ) params.company = companyQ;
-      if (divisionQ) params.division = divisionQ;
       const data = await api.getJobs(params);
       setJobs(data.jobs || []);
       setPagination(data.pagination || { total: 0, pages: 1 });
@@ -106,28 +83,27 @@ export function JobsListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, companyQ, divisionQ, page]);
+  }, [search, statusFilter, companyQ, page]);
 
   useEffect(() => {
     Promise.all([
-      api.getJobs({ status: 'Open', limit: '1', company: companyQ || undefined, division: divisionQ || undefined }),
-      api.getJobs({ status: 'Closed', limit: '1', company: companyQ || undefined, division: divisionQ || undefined }),
-      api.getJobs({ status: 'On Hold', limit: '1', company: companyQ || undefined, division: divisionQ || undefined }),
+      api.getJobs({ status: 'Open', limit: '1' }),
+      api.getJobs({ status: 'Closed', limit: '1' }),
+      api.getJobs({ status: 'On Hold', limit: '1' }),
     ]).then(([open, closed, hold]) => {
       setStats({
-        open: (open as any)?.pagination?.totalPositions ?? (open as any)?.pagination?.total ?? 0,
-        closed: (closed as any)?.pagination?.totalPositions ?? (closed as any)?.pagination?.total ?? 0,
-        onHold: (hold as any)?.pagination?.totalPositions ?? (hold as any)?.pagination?.total ?? 0,
+        open: open.pagination?.totalPositions || 0,
+        closed: closed.pagination?.totalPositions || 0,
+        onHold: hold.pagination?.totalPositions || 0,
       });
     }).catch(() => {});
-  }, [companyQ, divisionQ]);
+  }, []);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
-  useEffect(() => { setPage(1); }, [search, statusFilter, companyQ, divisionQ]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, companyQ]);
   useEffect(() => {
     api.getCompanyList().then((data: any) => {
-      const raw = Array.isArray(data) ? data : (data.companies || []);
-      setCompaniesList(dedupeCompanies(raw));
+      setCompaniesList(Array.isArray(data) ? data : (data.companies || []));
     }).catch(() => {});
   }, []);
 
@@ -245,11 +221,6 @@ export function JobsListPage() {
             <h1 className="text-2xl text-slate-800" style={{ fontWeight: 700 }}>Job Requirements</h1>
             <p className="text-slate-500 text-sm mt-0.5">Manage all JRs across companies</p>
           </div>
-          {canCreate && (
-            <button onClick={openCreate} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors">
-              <Plus className="w-4 h-4" /> Post New JR
-            </button>
-          )}
         </div>
 
         {/* Stats */}
@@ -281,13 +252,6 @@ export function JobsListPage() {
               placeholder="Filter by company…"
               className="pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500/30" />
           </div>
-          <select value={divisionQ} onChange={e => setDivisionQ(e.target.value)}
-            className="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none">
-            <option value="">All Divisions</option>
-            <option value="BPO">BPO Division</option>
-            <option value="IT">IT Division</option>
-            <option value="Lateral">Lateral Division</option>
-          </select>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
             className="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none">
             <option value="">All Status</option>
@@ -295,8 +259,8 @@ export function JobsListPage() {
             <option>Closed</option>
             <option>On Hold</option>
           </select>
-          {(search || statusFilter || companyQ || divisionQ) && (
-            <button onClick={() => { setSearch(''); setStatusFilter(''); setCompanyQ(''); setDivisionQ(''); }}
+          {(search || statusFilter || companyQ) && (
+            <button onClick={() => { setSearch(''); setStatusFilter(''); setCompanyQ(''); }}
               className="flex items-center gap-1 text-sm text-slate-400 hover:text-red-500 px-2 py-2 rounded-xl hover:bg-red-50">
               <X className="w-3.5 h-3.5" /> Clear
             </button>
@@ -323,7 +287,7 @@ export function JobsListPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    {['JR #', 'Title', 'Company', 'Raised By', 'Location', 'Positions', 'Candidates', 'Status', 'Created', ''].map(h => (
+                    {['JR #', 'Title', 'Company', 'Location', 'Positions', 'Candidates', 'Status', 'Created', ''].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs text-slate-500 uppercase tracking-wide" style={{ fontWeight: 600 }}>{h}</th>
                     ))}
                   </tr>
@@ -334,7 +298,7 @@ export function JobsListPage() {
                       <td className="px-4 py-3 text-xs" style={{ fontWeight: 500 }}>
                         <button
                           onClick={() => navigate(`/recruiter/jobs/${j._id}/summary`)}
-                          className="text-blue-600 hover:text-blue-800 hover:underline font-mono"
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
                         >
                           {j.jrNumber}
                         </button>
@@ -347,16 +311,6 @@ export function JobsListPage() {
                           className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                           <Building2 className="w-3 h-3" /> {j.companyName}
                         </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-slate-700 text-xs font-semibold">
-                          {j.createdBy?.name || j.recruiterName || '—'}
-                        </p>
-                        {(j.createdBy?.employeeId || j.createdBy?.role) && (
-                          <p className="text-[10px] text-slate-400 font-mono">
-                            {j.createdBy?.employeeId || ''} {j.createdBy?.role ? `· ${j.createdBy.role}` : ''}
-                          </p>
-                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs">{j.location || '—'}</td>
                       <td className="px-4 py-3">
@@ -397,9 +351,6 @@ export function JobsListPage() {
                               <Lock className="w-3.5 h-3.5" />
                             </span>
                           )}
-                          <button onClick={() => setViewJdJob(j)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View JR & Job Description">
-                            <FileText className="w-3.5 h-3.5" />
-                          </button>
                           <button onClick={() => openCandidatePanel(j)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="View candidates">
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -421,44 +372,16 @@ export function JobsListPage() {
           )}
 
           {pagination.pages > 1 && (
-            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 pr-20 bg-slate-50/50">
-              <div className="text-xs text-slate-500 font-medium">
-                Showing Page <span className="font-bold text-slate-800">{page}</span> of <span className="font-bold text-slate-800">{pagination.pages}</span> ({pagination.total || 0} total JRs)
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => p - 1)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Previous</span>
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400">Page {page} of {pagination.pages}</span>
+              <div className="flex gap-1">
+                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600">
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-
-                {/* Page Number Pills */}
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: pagination.pages }, (_, idx) => idx + 1).map(pNum => (
-                    <button
-                      key={pNum}
-                      onClick={() => setPage(pNum)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        page === pNum
-                          ? 'bg-green-600 text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {pNum}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  disabled={page >= pagination.pages}
-                  onClick={() => setPage(p => p + 1)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                <button disabled={page >= pagination.pages} onClick={() => setPage(p => p + 1)}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600">
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -489,8 +412,8 @@ export function JobsListPage() {
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500/30"
                   >
                     <option value="" disabled>Select Company</option>
-                    {dedupeCompanies(companiesList).map((c: any) => (
-                      <option key={c._id || c.id || c.companyName} value={c.companyName}>{c.companyName}</option>
+                    {companiesList.map((c: any) => (
+                      <option key={c._id || c.id} value={c.companyName}>{c.companyName}</option>
                     ))}
                   </select>
                 </div>
@@ -760,147 +683,6 @@ export function JobsListPage() {
                 })}
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* ── View JR & Job Description Modal ── */}
-    {viewJdJob && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Briefcase className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                    {viewJdJob.jrNumber}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[viewJdJob.status] || 'bg-slate-100 text-slate-500'}`}>
-                    {viewJdJob.status}
-                  </span>
-                </div>
-                <h2 className="text-slate-900 font-bold text-base mt-0.5">{viewJdJob.jobTitle}</h2>
-              </div>
-            </div>
-            <button
-              onClick={() => setViewJdJob(null)}
-              className="p-1.5 rounded-xl hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Modal Body */}
-          <div className="p-6 overflow-y-auto space-y-6 text-sm">
-            {/* Quick Details Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Raised By / Creator</p>
-                <p className="text-blue-700 font-bold">
-                  {viewJdJob.createdBy?.name || viewJdJob.recruiterName || '—'}
-                  {viewJdJob.createdBy?.employeeId ? ` (${viewJdJob.createdBy.employeeId})` : ''}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Company / Client</p>
-                <p className="text-slate-800 font-semibold">{viewJdJob.companyName || viewJdJob.client || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Location</p>
-                <p className="text-slate-800 font-semibold">{viewJdJob.location || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Experience</p>
-                <p className="text-slate-800 font-semibold">{viewJdJob.experience || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Job Type</p>
-                <p className="text-slate-800 font-semibold">{viewJdJob.jobType || 'Full Time'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Open Positions</p>
-                <p className="text-blue-600 font-bold">{viewJdJob.positions || 1}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Division</p>
-                <p className="text-slate-800 font-semibold">{viewJdJob.division || 'BPO'}</p>
-              </div>
-            </div>
-
-            {/* Job Description Text */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs uppercase tracking-wider text-slate-500 font-bold">Job Description</h3>
-                <button
-                  onClick={() => {
-                    const text = `Job Title: ${viewJdJob.jobTitle}\nJR Number: ${viewJdJob.jrNumber}\nCompany: ${viewJdJob.companyName || viewJdJob.client}\nLocation: ${viewJdJob.location || 'N/A'}\nExperience: ${viewJdJob.experience || 'N/A'}\n\nJob Description:\n${viewJdJob.description || 'N/A'}\n\nRequirements:\n${viewJdJob.requirements || 'N/A'}\n\nSkills:\n${Array.isArray(viewJdJob.skills) ? viewJdJob.skills.join(', ') : viewJdJob.skills || 'N/A'}`;
-                    navigator.clipboard.writeText(text);
-                    setCopiedJdId(viewJdJob._id);
-                    setTimeout(() => setCopiedJdId(null), 2000);
-                  }}
-                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
-                >
-                  {copiedJdId === viewJdJob._id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedJdId === viewJdJob._id ? 'Copied!' : 'Copy JD'}
-                </button>
-              </div>
-              {viewJdJob.description ? (
-                <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-4 text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
-                  {viewJdJob.description}
-                </div>
-              ) : (
-                <p className="text-slate-400 text-xs italic">No detailed description entered for this JR.</p>
-              )}
-            </div>
-
-            {/* Requirements */}
-            {viewJdJob.requirements && (
-              <div>
-                <h3 className="text-xs uppercase tracking-wider text-slate-500 font-bold mb-2">Requirements & Qualifications</h3>
-                <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-4 text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
-                  {viewJdJob.requirements}
-                </div>
-              </div>
-            )}
-
-            {/* Skills */}
-            {((Array.isArray(viewJdJob.skills) && viewJdJob.skills.length > 0) || (typeof viewJdJob.skills === 'string' && viewJdJob.skills.trim())) && (
-              <div>
-                <h3 className="text-xs uppercase tracking-wider text-slate-500 font-bold mb-2">Required Skills</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {(Array.isArray(viewJdJob.skills) ? viewJdJob.skills : viewJdJob.skills.split(',')).map((sk: string, i: number) => (
-                    <span key={i} className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 text-xs rounded-full font-medium">
-                      {sk.trim()}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Actions */}
-          <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between">
-            <button
-              onClick={() => {
-                const j = viewJdJob;
-                setViewJdJob(null);
-                navigate(`/recruiter/jobs/${j._id}/summary`);
-              }}
-              className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-bold"
-            >
-              Open Full JR Summary Page →
-            </button>
-            <button
-              onClick={() => setViewJdJob(null)}
-              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
-            >
-              Close
-            </button>
           </div>
         </div>
       </div>

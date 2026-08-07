@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const reviewController = require('../controllers/review.controller');
-const { auth, authorize } = require('../middleware/auth.middleware');
+const { protect, restrictTo } = require('../middleware/auth');
 
-router.use(auth);
-router.use(authorize('admin', 'tl', 'manager'));
+router.use(protect);
+router.use(restrictTo('admin', 'tl', 'manager'));
 
 router.get('/', reviewController.getReviews);
 router.post('/', reviewController.createReview);

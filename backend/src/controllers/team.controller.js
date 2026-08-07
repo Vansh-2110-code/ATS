@@ -12,9 +12,9 @@ exports.getTeamMembers = async (req, res) => {
 
     let formattedMembers = [];
 
-    if (tlUser.role === 'admin' && (!tlId || tlId === 'all')) {
-      // Admin preview mode: show all active recruiters
-      const allRecruiters = await User.find({ role: 'recruiter', status: { $ne: 'Suspended' } }).lean().exec();
+    if (tlUser.role === 'admin' && !tlId) {
+      // Admin preview mode: show all recruiters
+      const allRecruiters = await User.find({ role: 'recruiter' }).lean().exec();
       formattedMembers = allRecruiters.map(r => ({
         _id: r._id,
         name: r.name,
@@ -23,20 +23,18 @@ exports.getTeamMembers = async (req, res) => {
         role: r.role,
       }));
     } else {
-      const members = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null })
-        .populate('memberId', 'name email employeeId role status')
+      const members = await TeamMember.find({ teamLeaderId: targetTlId })
+        .populate('memberId', 'name email employeeId role')
         .lean()
         .exec();
 
-      formattedMembers = members
-        .filter(m => m && m.memberId && m.memberId.status !== 'Suspended')
-        .map(m => ({
-          _id: m.memberId._id || m.memberId,
-          name: m.memberId.name || 'Recruiter',
-          email: m.memberId.email || '',
-          employeeId: m.memberId.employeeId || '',
-          role: m.memberId.role || 'recruiter',
-        }));
+      formattedMembers = members.map(m => ({
+        _id: m.memberId._id,
+        name: m.memberId.name,
+        email: m.memberId.email,
+        employeeId: m.memberId.employeeId,
+        role: m.memberId.role,
+      }));
     }
 
     res.json({ success: true, members: formattedMembers });
@@ -57,7 +55,7 @@ exports.addTeamMember = async (req, res) => {
     const targetTlId = (currentUser.role === 'admin' || currentUser.role === 'manager') && tlId ? tlId : currentUser._id;
 
     // Find the recruiter by _id or employeeId
-    let recruiterQuery = { role: 'recruiter', status: { $ne: 'Suspended' } };
+    let recruiterQuery = { role: 'recruiter' };
     if (mongoose.Types.ObjectId.isValid(employeeId)) {
       recruiterQuery._id = employeeId;
     } else {
@@ -66,16 +64,17 @@ exports.addTeamMember = async (req, res) => {
 
     const recruiter = await User.findOne(recruiterQuery);
     if (!recruiter) {
-      return res.status(404).json({ message: 'Recruiter not found or is suspended' });
+      return res.status(404).json({ message: 'Recruiter not found' });
     }
 
-    // Check if already assigned to ANY team leader
+    // Check if already assigned
     const existing = await TeamMember.findOne({
+      teamLeaderId: targetTlId,
       memberId: recruiter._id,
     });
 
     if (existing) {
-      return res.status(400).json({ message: 'Recruiter is already assigned to a Team Leader' });
+      return res.status(400).json({ message: 'Recruiter already in your team' });
     }
 
     // Create team member record
@@ -133,7 +132,7 @@ exports.removeTeamMember = async (req, res) => {
 // ─── Get Team Leaders (for Admin/Manager) ──────────────────────
 exports.getTeamLeaders = async (req, res) => {
   try {
-    const leaders = await User.find({ role: 'tl', status: { $ne: 'Suspended' } })
+    const leaders = await User.find({ role: 'tl' })
       .select('name email employeeId role _id')
       .lean()
       .exec();
@@ -151,7 +150,7 @@ exports.addTeamLeader = async (req, res) => {
     const { employeeId } = req.body;
     const mongoose = require('mongoose');
 
-    let query = { status: { $ne: 'Suspended' } };
+    let query = {};
     if (mongoose.Types.ObjectId.isValid(employeeId)) {
       query._id = employeeId;
     } else {
@@ -160,7 +159,7 @@ exports.addTeamLeader = async (req, res) => {
 
     const user = await User.findOne(query);
     if (!user) {
-      return res.status(404).json({ message: 'Employee not found or is suspended' });
+      return res.status(404).json({ message: 'Employee not found' });
     }
 
     // Check if already TL
@@ -221,37 +220,31 @@ exports.removeTeamLeader = async (req, res) => {
 exports.getAvailableEmployees = async (req, res) => {
   try {
     const { role } = req.query;
+    const tlUser = req.user;
 
-    let query = { status: { $ne: 'Suspended' } };
+    // Build query
+    let query = {};
     if (role === 'recruiter') {
-      query.role = 'recruiter';
+      query = { role: 'recruiter' };
     } else if (role === 'tl') {
-      query.role = { $in: ['recruiter'] };
+      query = { role: { $in: ['recruiter'] } }; // Can nominate from recruiters
     }
 
+    // Get requested employees
     const employees = await User.find(query)
-      .select('name email employeeId role status _id')
+      .select('name email employeeId role _id')
       .lean()
       .exec();
 
-    // Filter out recruiters who are ALREADY assigned to ANY Team Leader
-    if (role === 'recruiter') {
-      const assignedRecords = await TeamMember.find({})
+    // If TL requesting, filter out already assigned members
+    if (tlUser.role === 'tl') {
+      const assignedIds = await TeamMember.find({ teamLeaderId: tlUser._id })
         .select('memberId')
         .lean()
         .exec();
 
-      const assignedSet = new Set(assignedRecords.map(m => m.memberId ? m.memberId.toString() : ''));
+      const assignedSet = new Set(assignedIds.map(m => m.memberId.toString()));
       const available = employees.filter(emp => !assignedSet.has(emp._id.toString()));
-
-      return res.json({ success: true, employees: available });
-    }
-
-    // Filter out employees who are ALREADY Team Leaders
-    if (role === 'tl') {
-      const existingTLs = await User.find({ role: 'tl' }).select('_id').lean();
-      const tlSet = new Set(existingTLs.map(t => t._id.toString()));
-      const available = employees.filter(emp => !tlSet.has(emp._id.toString()));
 
       return res.json({ success: true, employees: available });
     }
@@ -262,4 +255,3 @@ exports.getAvailableEmployees = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-

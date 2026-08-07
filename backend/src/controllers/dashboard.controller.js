@@ -7,7 +7,6 @@ const Attendance = require('../models/Attendance');
 const AuditLog = require('../models/AuditLog');
 const WalkIn = require('../models/WalkIn');
 const TeamMember = require('../models/TeamMember');
-const Job = require('../models/Job');
 const { getDateRange } = require('../utils/helpers');
 
 // GET /api/dashboard/recruiter
@@ -23,9 +22,10 @@ exports.recruiterDashboard = async (req, res, next) => {
     let filterRecruiter = userId;
     if (isAdmin) {
       if (recruiter) {
+        // If admin/manager/tl wants a specific recruiter
         filterRecruiter = new mongoose.Types.ObjectId(recruiter);
       } else {
-        filterRecruiter = null;
+        filterRecruiter = null; // Admin viewing all
       }
     }
 
@@ -44,79 +44,51 @@ exports.recruiterDashboard = async (req, res, next) => {
 
     const pipeline = {};
     Candidate.STATUSES.forEach(s => { pipeline[s] = 0; });
-    statusCounts.forEach(s => { if (s._id) pipeline[s._id] = s.count; });
-
-    // Candidate & Job metrics for Requirements 16 & 20
-    const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));
-    const endOfToday = new Date(new Date().setHours(23, 59, 59, 999));
-
-    const profilesUploadedTodayMatch = {
-      createdAt: { $gte: startOfToday, $lt: endOfToday }
-    };
-    if (filterRecruiter) profilesUploadedTodayMatch.assignedRecruiter = filterRecruiter;
-
-    const profilesUploadedToday = await Candidate.countDocuments(profilesUploadedTodayMatch);
-    const openRequirements = await Job.countDocuments({ status: { $regex: /^open$/i } });
-
-    const recruiterCandidateFilter = filterRecruiter ? { assignedRecruiter: filterRecruiter } : {};
-
-    const eligibleCount = await Candidate.countDocuments({
-      ...recruiterCandidateFilter,
-      status: { $regex: /eligible/i }
-    });
-
-    const finalSelectCount = await Candidate.countDocuments({
-      ...recruiterCandidateFilter,
-      status: { $in: ['L1 Select', 'Client Select', 'Final Select', 'Selected'] }
-    });
-
-    const waitingForOfferCount = await Candidate.countDocuments({
-      ...recruiterCandidateFilter,
-      status: { $in: ['Offer Released', 'Yet To Join', 'Documentation in Progress', 'Documentation'] }
-    });
-
-    const joinedCount = await Candidate.countDocuments({
-      ...recruiterCandidateFilter,
-      status: 'Joined'
-    });
+    statusCounts.forEach(s => { pipeline[s._id] = s.count; });
 
     // Call stats
-    const totalCalls = await CallLog.countDocuments({ recruiter: userId, createdAt: dateFilter });
-    const todayCalls = await CallLog.countDocuments({
-      recruiter: userId,
-      createdAt: { $gte: startOfToday },
-    });
+    const callMatch = { createdAt: dateFilter };
+    if (filterRecruiter) callMatch.recruiter = filterRecruiter;
+    const totalCalls = await CallLog.countDocuments(callMatch);
+
+    const todayCallMatch = { createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } };
+    if (filterRecruiter) todayCallMatch.recruiter = filterRecruiter;
+    const todayCalls = await CallLog.countDocuments(todayCallMatch);
 
     // Interview stats
-    const totalInterviews = await Interview.countDocuments({ recruiter: userId, createdAt: dateFilter });
-    const scheduledInterviews = await Interview.countDocuments({ recruiter: userId, status: 'Scheduled' });
+    const intMatch = { createdAt: dateFilter };
+    if (filterRecruiter) intMatch.recruiter = filterRecruiter;
+    const totalInterviews = await Interview.countDocuments(intMatch);
+
+    const schedMatch = { status: 'Scheduled' };
+    if (filterRecruiter) schedMatch.recruiter = filterRecruiter;
+    const scheduledInterviews = await Interview.countDocuments(schedMatch);
 
     // Candidates
     const totalCandidates = await Candidate.countDocuments(baseMatch);
-    const joined = joinedCount;
+    const joined = await Candidate.countDocuments({ ...baseMatch, status: 'Joined' });
 
-    // Follow-ups
-    const followUps = await Candidate.find({
-      ...(!isAdmin && { assignedRecruiter: userId }),
-      'notes.followUpDate': { $gte: startOfToday, $lt: endOfToday },
-    }).select('name phone status notes').limit(10);
+    // Follow-ups (candidates with follow-up notes)
+    const followUpMatch = {
+      'notes.followUpDate': { $gte: new Date(new Date().setHours(0, 0, 0, 0)), $lt: new Date(new Date().setHours(23, 59, 59, 999)) }
+    };
+    if (filterRecruiter) followUpMatch.assignedRecruiter = filterRecruiter;
+    
+    const followUps = await Candidate.find(followUpMatch).select('name phone status notes').limit(10);
 
     // Recent activity
-    const recentActivity = await AuditLog.find({ user: userId })
+    const activityMatch = {};
+    if (filterRecruiter) activityMatch.user = filterRecruiter;
+
+    const recentActivity = await AuditLog.find(activityMatch)
       .sort('-timestamp').limit(10)
       .select('action timestamp type');
 
     // Call target (daily = 50)
-    const callTarget = { target: 50, completed: profilesUploadedToday };
+    const callTarget = { target: 50, completed: todayCalls };
 
     res.json({
       metrics: {
-        profilesUploadedToday,
-        openRequirements,
-        eligibleCount,
-        finalSelectCount,
-        waitingForOfferCount,
-        joinedCount,
         totalCandidates,
         totalCalls,
         todayCalls,
@@ -138,12 +110,8 @@ exports.recruiterDashboard = async (req, res, next) => {
 // GET /api/dashboard/tl
 exports.tlDashboard = async (req, res, next) => {
   try {
-    const { range = 'month', startDate, endDate, tlId } = req.query;
+    const { tlId } = req.query;
     const currentUser = req.user;
-    const { getDateRange } = require('../utils/helpers');
-    const selectedRange = (range || 'month').toLowerCase();
-    const { start, end } = getDateRange(selectedRange, startDate, endDate);
-    const dateFilter = selectedRange === 'all' ? {} : { $gte: start, $lt: end };
 
     // Determine target TL ID: Admins can specify, TLs get their own
     const targetTlId = (currentUser.role === 'admin' || currentUser.role === 'manager') && tlId ? tlId : currentUser._id;
@@ -153,13 +121,9 @@ exports.tlDashboard = async (req, res, next) => {
       .populate('memberId', 'name email employeeId status')
       .lean();
     
-    let recruiters = teamAssignments
+    const recruiters = teamAssignments
       .map(ta => ta.memberId)
       .filter(u => u && u.status === 'Active');
-
-    if (recruiters.length === 0 && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
-      recruiters = await User.find({ role: { $in: ['recruiter', 'tl'] }, status: { $ne: 'Suspended' } }).select('name email employeeId status').lean();
-    }
 
     const recruiterIds = recruiters.map(r => r._id);
 
@@ -169,35 +133,16 @@ exports.tlDashboard = async (req, res, next) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const teamStats = await Promise.all(recruiters.map(async (r) => {
-      const callsMatch = selectedRange === 'all' ? { assignedRecruiter: r._id } : { assignedRecruiter: r._id, 'notes.createdAt': dateFilter };
+      // Count notes added today as "calls made" (each note = a recruiter interaction)
       const callsAgg = await Candidate.aggregate([
-        { $match: { assignedRecruiter: r._id } },
-        { $unwind: '$notes' },
-        ...(selectedRange !== 'all' ? [{ $match: { 'notes.createdAt': dateFilter } }] : []),
-        { $count: 'count' },
-      ]);
-      const totalCalls = callsAgg[0]?.count || 0;
-
-      const dateMatch = (extra) => {
-        const query = { assignedRecruiter: r._id, ...extra };
-        if (selectedRange !== 'all') query.updatedAt = dateFilter;
-        return query;
-      };
-
-      const eligible = await Candidate.countDocuments(dateMatch({ status: { $in: ['Eligible', 'Eligible Candidates'] } }));
-      const finalSelect = await Candidate.countDocuments(dateMatch({ status: { $in: ['Final Select', 'Final Round Scheduled', 'Final Round Completed'] } }));
-      const docCompleted = await Candidate.countDocuments(dateMatch({ status: { $in: ['Documentation Completed', 'Documentation Incomplete', 'Document Initialized', 'Documennt Initialted', 'Documentation'] } }));
-      const offerAccept = await Candidate.countDocuments(dateMatch({ status: { $in: ['Offer Accept', 'Offer Accepted', 'Offered', 'Offer Released'] } }));
-      const joined = await Candidate.countDocuments(dateMatch({ status: 'Joined' }));
-
-      const todayCallsAgg = await Candidate.aggregate([
         { $match: { assignedRecruiter: r._id } },
         { $unwind: '$notes' },
         { $match: { 'notes.createdAt': { $gte: today, $lt: tomorrow } } },
         { $count: 'count' },
       ]);
-      const todayCalls = todayCallsAgg[0]?.count || 0;
+      const todayCalls = callsAgg[0]?.count || 0;
 
+      // Count candidates with interview scheduled today
       const todayInterviews = await Candidate.countDocuments({
         assignedRecruiter: r._id,
         $or: [
@@ -206,6 +151,7 @@ exports.tlDashboard = async (req, res, next) => {
         ],
       });
 
+      // Count candidates needing TL follow-up (Eligible, but no TL call submitted)
       const followUps = await Candidate.countDocuments({
         assignedRecruiter: r._id,
         firstCallStatus: 'Eligible',
@@ -218,6 +164,18 @@ exports.tlDashboard = async (req, res, next) => {
         status: { $nin: ['Rejected', 'Joined'] },
       });
 
+      const totalCallsAgg = await Candidate.aggregate([
+        { $match: { assignedRecruiter: r._id } },
+        { $unwind: '$notes' },
+        { $count: 'count' },
+      ]);
+      const totalCalls = totalCallsAgg[0]?.count || 0;
+
+      const totalInterviewsScheduled = await Candidate.countDocuments({
+        assignedRecruiter: r._id,
+        status: { $in: ['Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Shortlisted', 'HR Round Scheduled', 'Final Round Scheduled', 'Selected', 'Rejected'] }
+      });
+
       return {
         id: r._id,
         name: r.name,
@@ -225,30 +183,15 @@ exports.tlDashboard = async (req, res, next) => {
         employeeId: r.employeeId,
         todayCalls,
         totalCalls,
-        eligible,
-        finalSelect,
-        docCompleted,
-        offerAccept,
-        joined,
         callTarget: 50,
         todayInterviews,
-        totalInterviewsScheduled: finalSelect,
+        totalInterviewsScheduled,
         followUps,
         totalCandidates,
         activeCandidates,
         onTarget: todayCalls >= 50,
       };
     }));
-
-    // Team Summary Totals
-    const summary = {
-      totalCalls: teamStats.reduce((s, r) => s + r.totalCalls, 0),
-      eligible: teamStats.reduce((s, r) => s + r.eligible, 0),
-      finalSelect: teamStats.reduce((s, r) => s + r.finalSelect, 0),
-      docCompleted: teamStats.reduce((s, r) => s + r.docCompleted, 0),
-      offerAccept: teamStats.reduce((s, r) => s + r.offerAccept, 0),
-      joined: teamStats.reduce((s, r) => s + r.joined, 0),
-    };
 
     // Pending corrections (filtered by team members)
     const corrections = await Candidate.find({ 
@@ -263,7 +206,6 @@ exports.tlDashboard = async (req, res, next) => {
     const onTarget = teamStats.filter(t => t.onTarget).length;
 
     res.json({
-      summary,
       teamMembers: teamStats,
       corrections,
       teamHealth: {
@@ -384,13 +326,6 @@ exports.managerDashboard = async (req, res, next) => {
 // GET /api/dashboard/admin
 exports.adminDashboard = async (req, res, next) => {
   try {
-    const { range = 'day', dateRange, fromDate, toDate, from, to, customFrom, customTo } = req.query;
-    const { getDateRange } = require('../utils/helpers');
-    const selectedRange = (range || dateRange || 'day').toLowerCase();
-    const { start, end } = getDateRange(selectedRange, fromDate || from || customFrom, toDate || to || customTo);
-
-    const dateFilter = selectedRange === 'all' ? {} : { $gte: start, $lt: end };
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -399,10 +334,7 @@ exports.adminDashboard = async (req, res, next) => {
     // Active users today
     const activeLogins = await Attendance.countDocuments({ date: { $gte: today, $lt: tomorrow } });
     const totalUsers = await User.countDocuments({ status: 'Active' });
-
-    // Total Resumes (filtered by range if not all)
-    const resumeFilter = selectedRange === 'all' ? {} : { createdAt: dateFilter };
-    const totalResumes = await Candidate.countDocuments(resumeFilter);
+    const totalResumes = await Candidate.countDocuments();
 
     // Attendance rate
     const attendanceRate = totalUsers > 0 ? Math.round((activeLogins / totalUsers) * 100) : 0;
@@ -410,51 +342,33 @@ exports.adminDashboard = async (req, res, next) => {
     // ── NEW DASHBOARD CARD COUNTS ────────────────────────────────────
     const Job = require('../models/Job');
 
-    const statusMatch = (statusCond) => {
-      const match = { ...statusCond };
-      if (selectedRange !== 'all') match.createdAt = dateFilter;
-      return match;
-    };
-
     // Pending Follow-ups: candidates with any follow-up note due today or earlier
-    const pendingFollowUps = await Candidate.countDocuments(statusMatch({
+    const pendingFollowUps = await Candidate.countDocuments({
       status: { $nin: ['Rejected', 'Joined', 'Exited'] },
       'notes.followUpDate': { $exists: true, $lte: tomorrow },
-    }));
+    });
 
-    // Selected count
-    const selectedCount = await Candidate.countDocuments(statusMatch({ status: 'Selected' }));
+    // HR Round: candidates in HR Shortlist status
+    const hrRoundCount = await Candidate.countDocuments({ status: 'HR Shortlist' });
 
-    // Operations Round count
-    const opsRoundCount = await Candidate.countDocuments(statusMatch({ status: 'Operations Round' }));
-
-    // HR Round: candidates in HR Shortlist / HR Round status
-    const hrRoundCount = await Candidate.countDocuments(statusMatch({ status: { $in: ['HR Shortlist', 'HR Round'] } }));
-
-    // Follow to Join / Yet To Join: candidates with status 'Yet To Join'
-    const yetToJoinCount = await Candidate.countDocuments(statusMatch({ status: 'Yet To Join' }));
-    const followToJoinCount = yetToJoinCount;
+    // Follow to Join: candidates with status 'Yet To Join'
+    const followToJoinCount = await Candidate.countDocuments({ status: 'Yet To Join' });
 
     // Joined count
-    const joinedCount = await Candidate.countDocuments(statusMatch({ status: 'Joined' }));
+    const joinedCount = await Candidate.countDocuments({ status: 'Joined' });
 
     // Rejected count
-    const rejectedCount = await Candidate.countDocuments(statusMatch({ status: 'Rejected' }));
+    const rejectedCount = await Candidate.countDocuments({ status: 'Rejected' });
 
-    // Open Jobs & Open Positions count
-    const jobMatch = selectedRange !== 'all' ? { status: 'Open', createdAt: dateFilter } : { status: 'Open' };
-    const openJobsAgg = await Job.aggregate([
-      { $match: jobMatch },
-      { $group: { _id: null, totalPositions: { $sum: '$positions' }, count: { $sum: 1 } } }
-    ]);
-    const openJobsCount = openJobsAgg[0]?.count || await Job.countDocuments(jobMatch);
-    const openPositionsCount = openJobsAgg[0]?.totalPositions || openJobsCount;
+    // Open Jobs count
+    const openJobsCount = await Job.countDocuments({ status: 'Open' });
 
-    // Revenue in period
+    // Revenue this month (from Revenue model if it exists)
     let currentMonthRevenue = 0;
     try {
       const Revenue = require('../models/Revenue');
-      const revenueDoc = await Revenue.findOne({ month: start.getMonth() + 1, year: start.getFullYear() });
+      const now = new Date();
+      const revenueDoc = await Revenue.findOne({ month: now.getMonth() + 1, year: now.getFullYear() });
       currentMonthRevenue = revenueDoc?.actual || 0;
     } catch (e) {
       currentMonthRevenue = 0;
@@ -463,7 +377,6 @@ exports.adminDashboard = async (req, res, next) => {
 
     // Source chart
     const sourceChart = await Candidate.aggregate([
-      { $match: resumeFilter },
       { $group: { _id: '$source', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
@@ -476,37 +389,35 @@ exports.adminDashboard = async (req, res, next) => {
     // System metrics
     const todayLogs = await AuditLog.countDocuments({ timestamp: { $gte: today, $lt: tomorrow } });
 
-    // Calculate total revenue and get candidate revenue details
-    const revenueMatch = selectedRange !== 'all' ? { revenueGenerated: { $gt: 0 }, createdAt: dateFilter } : { revenueGenerated: { $gt: 0 } };
-    const revenueData = await Candidate.aggregate([
-      { $match: revenueMatch },
-      { $project: { _id: 1, name: 1, revenueGenerated: 1, joiningSalary: 1, placementPercentage: 1, dateOfJoining: 1, status: 1 } },
-      { $sort: { revenueGenerated: -1 } }
-    ]);
-    const totalRevenue = revenueData.reduce((sum, c) => sum + (c.revenueGenerated || 0), 0);
+    
+      // Calculate total revenue and get candidate revenue details
+      const revenueData = await Candidate.aggregate([
+        { $match: { revenueGenerated: { $gt: 0 } } },
+        { $project: { _id: 1, name: 1, revenueGenerated: 1, joiningSalary: 1, placementPercentage: 1, dateOfJoining: 1, status: 1 } },
+        { $sort: { revenueGenerated: -1 } }
+      ]);
+      const totalRevenue = revenueData.reduce((sum, c) => sum + (c.revenueGenerated || 0), 0);
 
-    res.json({
-      totalRevenue,
-      revenueCandidates: revenueData,
+      res.json({
+        totalRevenue,
+        revenueCandidates: revenueData,
       metrics: {
         activeLogins,
         totalUsers,
         totalResumes,
         attendanceRate,
         todayLogs,
+        // New dashboard card counts
         totalCandidates: totalResumes,
         pendingFollowUps,
-        selectedCount,
-        opsRoundCount,
-        operationsRoundCount: opsRoundCount,
         hrRoundCount,
-        yetToJoinCount,
         followToJoinCount,
+        joinedCount,
+        rejectedCount,
         openJobsCount,
-        openPositionsCount,
         currentMonthRevenue,
       },
-      sourceChart: sourceChart.map(s => ({ source: s._id || 'Other', count: s.count })),
+      sourceChart: sourceChart.map(s => ({ source: s._id || 'Unknown', count: s.count })),
       alerts: alerts.map(a => ({
         id: a._id,
         message: a.action,
@@ -515,7 +426,6 @@ exports.adminDashboard = async (req, res, next) => {
         severity: a.type === 'delete' ? 'high' : 'medium',
         time: a.timestamp,
       })),
-      dateRange: selectedRange,
     });
   } catch (err) {
     next(err);
@@ -665,209 +575,44 @@ exports.allTeamsDashboard = async (req, res, next) => {
 // GET /api/dashboard/division
 exports.divisionDashboard = async (req, res, next) => {
   try {
-    const { division = 'BPO', company, tlId, recruiterId } = req.query;
+    const { division = 'BPO' } = req.query;
     const Job = require('../models/Job');
     const Candidate = require('../models/Candidate');
-    const TeamMember = require('../models/TeamMember');
-    const User = require('../models/User');
-
-    let userIds = [];
-    let userNames = [];
-
-    if (recruiterId && recruiterId !== 'All Recruiters') {
-      const recUser = await User.findOne({
-        $or: [
-          { _id: mongoose.Types.ObjectId.isValid(recruiterId) ? recruiterId : null },
-          { name: recruiterId }
-        ]
-      }).select('_id name');
-      if (recUser) {
-        userIds = [recUser._id];
-        userNames = [recUser.name];
-      } else {
-        userIds = [recruiterId];
-        userNames = [recruiterId];
-      }
-    } else if (tlId && tlId !== 'All Team Leaders') {
-      const tlUser = await User.findOne({
-        $or: [
-          { _id: mongoose.Types.ObjectId.isValid(tlId) ? tlId : null },
-          { name: tlId }
-        ]
-      }).select('_id name');
-      const targetTlId = tlUser ? tlUser._id : tlId;
-      const targetTlName = tlUser ? tlUser.name : tlId;
-
-      const teamAssigned = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null }).lean();
-      const memberIds = teamAssigned.map(m => m.memberId).filter(Boolean);
-
-      userIds = [targetTlId, ...memberIds];
-
-      const memberUsers = await User.find({ _id: { $in: userIds } }).select('_id name');
-      userNames = memberUsers.map(u => u.name).filter(Boolean);
-      if (targetTlName && !userNames.includes(targetTlName)) userNames.push(targetTlName);
-    }
-
-    const jobQuery = { division };
-    const candQuery = { division };
-
-    // Apply User / TL filter
-    if (userIds.length > 0) {
-      const candUserCond = [
-        { assignedRecruiter: { $in: userIds } },
-        { assignedRecruiterName: { $in: userNames } }
-      ];
-
-      const candidateJobs = await Candidate.distinct('positionApplied', { assignedRecruiter: { $in: userIds } });
-      const candidateJrs = await Candidate.distinct('jrNumber', { assignedRecruiter: { $in: userIds } });
-
-      const jobUserCond = [
-        { createdBy: { $in: userIds } },
-        { 'assignedRecruiters.recruiterId': { $in: userIds } },
-        { recruiterName: { $in: userNames } }
-      ];
-      if (candidateJobs.length > 0) jobUserCond.push({ jobTitle: { $in: candidateJobs } });
-      if (candidateJrs.length > 0) jobUserCond.push({ jrNumber: { $in: candidateJrs } });
-
-      if (company && company !== 'All Companies') {
-        const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
-        candQuery.$and = [
-          { $or: [{ clientName: companyRegex }, { company: companyRegex }, { client: companyRegex }] },
-          { $or: candUserCond }
-        ];
-        jobQuery.$and = [
-          { $or: [{ companyName: companyRegex }, { client: companyRegex }] },
-          { $or: jobUserCond }
-        ];
-      } else {
-        candQuery.$or = candUserCond;
-        jobQuery.$or = jobUserCond;
-      }
-    } else if (company && company !== 'All Companies') {
-      const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
-      candQuery.$or = [
-        { clientName: companyRegex },
-        { company: companyRegex },
-        { client: companyRegex },
-      ];
-      jobQuery.$or = [
-        { companyName: companyRegex },
-        { client: companyRegex },
-      ];
-    }
 
     // 1. Open Positions & total JRs
-    const openJobs = await Job.find({ ...jobQuery, status: 'Open' });
+    const openJobs = await Job.find({ division, status: 'Open' });
     const openPositions = openJobs.reduce((sum, j) => sum + (j.positions || 0), 0);
     const totalJRs = openJobs.length;
 
-    // 2. Comprehensive Candidate Stage Matching
-    const screeningStatuses = [
-      'Eligible', 'Eligible Candidates', 'Screening', 'Shortlisted', 'Submitted to Client', 'Submitted To Client',
-      'Sublitted To Client', 'Walkin Company', 'Walkin WHM', 'Call Back', 'Hold', 'No Response',
-      'Duplicate-Client', 'Walk-in Submitted', 'Contacted', 'Interested', 'Selected for Call', 'New', 'HR Shortlist',
-      'Did Not Pick', 'Switched Off', 'Busy', 'Not Reachable', 'Wrong Number', 'Ringing', 'No Pick'
-    ];
+    // 2. Candidates in each stage
+    const screeningCount = await Candidate.countDocuments({ division, currentStage: 'Screening', status: { $ne: 'Rejected' } });
+    const interviewCount = await Candidate.countDocuments({ division, currentStage: 'Interview', status: { $ne: 'Rejected' } });
+    const offerCount = await Candidate.countDocuments({ division, currentStage: 'Offer', status: { $ne: 'Rejected' } });
+    const joinedCount = await Candidate.countDocuments({ division, status: 'Joined' });
+    const yetToJoinCount = await Candidate.countDocuments({ division, status: 'Yet To Join' });
 
-    const interviewStatuses = [
-      'Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Interview',
-      'Selected for Interview', 'Written Test', 'Operations Round', 'Interview Feedback Pending'
-    ];
-
-    const offerStatuses = [
-      'Document Initialized', 'Documennt Initialted', 'Documentation Completed',
-      'Documentation Incomplete', 'Waiting for Offer', 'Offer Accept', 'Offered',
-      'Offer Released', 'Offer Accepted', 'Document Pending', 'Documentation',
-      'Selected', 'L1 Select', 'L2 Select', 'Final Select', 'VNA Select', 'Test Select', 'Client Select'
-    ];
-
-    const baseYetToJoinOr = [
-      { status: { $in: ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'] } },
-      { candidateStatusPostOffer: 'Yet To Join' },
-      { currentStage: 'Joining', status: { $ne: 'Joined' } }
-    ];
-
-    function buildQueryWithOr(baseQuery, extraOrArray) {
-      if (baseQuery.$and) {
-        return {
-          ...baseQuery,
-          $and: [...baseQuery.$and, { $or: extraOrArray }]
-        };
-      }
-      if (baseQuery.$or) {
-        const { $or: existingOr, ...rest } = baseQuery;
-        return {
-          ...rest,
-          $and: [
-            { $or: existingOr },
-            { $or: extraOrArray }
-          ]
-        };
-      }
-      return {
-        ...baseQuery,
-        $or: extraOrArray
-      };
-    }
-
-    const screeningMatch = buildQueryWithOr(candQuery, [
-      { status: { $in: screeningStatuses } }
-    ]);
-
-    const interviewMatch = buildQueryWithOr(candQuery, [
-      { status: { $in: interviewStatuses } }
-    ]);
-
-    const offerMatch = buildQueryWithOr(candQuery, [
-      { status: { $in: offerStatuses } }
-    ]);
-
-    const yetToJoinMatch = buildQueryWithOr(candQuery, [
-      { status: { $in: ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'] } }
-    ]);
-
-    const [
-      screeningCount,
-      interviewCount,
-      offerCount,
-      yetToJoinCount,
-      joinedCount,
-      joinedCandidates,
-      yetToJoinCandidates
-    ] = await Promise.all([
-      Candidate.countDocuments(screeningMatch),
-      Candidate.countDocuments(interviewMatch),
-      Candidate.countDocuments(offerMatch),
-      Candidate.countDocuments(yetToJoinMatch),
-      Candidate.countDocuments({ ...candQuery, status: 'Joined' }),
-      Candidate.find({ ...candQuery, status: 'Joined' })
-        .select('name positionApplied clientName dateOfJoining assignedRecruiterName status')
-        .sort('-dateOfJoining'),
-      Candidate.find(yetToJoinMatch)
-        .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status candidateStatusPostOffer')
-        .sort('-createdAt')
-    ]);
+    // 3. Joined Candidates with Date of Joining
+    const joinedCandidates = await Candidate.find({ division, status: 'Joined' })
+      .select('name positionApplied clientName dateOfJoining assignedRecruiterName')
+      .sort('-dateOfJoining');
 
     res.json({
       division,
-      company: company || 'All Companies',
       openPositions,
       totalJRs,
       pipeline: {
         screening: screeningCount,
         interview: interviewCount,
         offer: offerCount,
-        yetToJoin: yetToJoinCount,
-        joined: joinedCount
+        joined: joinedCount,
+        yetToJoin: yetToJoinCount
       },
-      joinedCandidates,
-      yetToJoinCandidates
+      joinedCandidates
     });
   } catch (err) {
     next(err);
   }
 };
-
 
 // GET /api/dashboard/reports/advanced
 exports.advancedReports = async (req, res, next) => {
@@ -949,11 +694,6 @@ exports.advancedReports = async (req, res, next) => {
               $cond: [{ $eq: ['$status', 'Selected'] }, 1, 0]
             }
           },
-          yetToJoin: {
-            $sum: {
-              $cond: [{ $in: ['$status', ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed']] }, 1, 0]
-            }
-          },
           joined: {
             $sum: {
               $cond: [{ $eq: ['$status', 'Joined'] }, 1, 0]
@@ -1026,173 +766,6 @@ exports.advancedReports = async (req, res, next) => {
       };
     });
 
-    // 6. Active JR Report (JR Nos, Customer Name, Skills, Active profiles in Pipeline)
-    const openJobs = await Job.find({ status: { $ne: 'Closed' } })
-      .populate('createdBy', 'name email employeeId role')
-      .lean();
-
-    const activeJRsReport = await Promise.all(openJobs.map(async (j) => {
-      const escapedTitle = (j.jobTitle || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const activeCandidates = await Candidate.find({
-        $or: [
-          { jrNumber: j.jrNumber },
-          { positionApplied: { $regex: `^${escapedTitle}$`, $options: 'i' } }
-        ],
-        status: { $nin: ['Rejected', 'Exited'] }
-      }).select('name phone email status currentStage assignedRecruiterName createdAt updatedAt').lean();
-
-      return {
-        _id: j._id,
-        jrNumber: j.jrNumber || '—',
-        customerName: j.companyName || j.client || '—',
-        jobTitle: j.jobTitle || '—',
-        skills: Array.isArray(j.skills) ? j.skills.join(', ') : (j.skills || '—'),
-        location: j.location || '—',
-        positions: j.positions || 1,
-        status: j.status || 'Open',
-        createdBy: j.createdBy?.name || j.recruiterName || 'Admin',
-        activeProfilesCount: activeCandidates.length,
-        activeCandidates: activeCandidates.map(c => ({
-          _id: c._id,
-          name: c.name,
-          phone: c.phone,
-          email: c.email,
-          status: c.status,
-          stage: c.currentStage,
-          recruiter: c.assignedRecruiterName || 'Unassigned',
-          updatedAt: c.updatedAt || c.createdAt
-        }))
-      };
-    }));
-
-    // 7. Active Status Profiles (Documentation process, Pending with Customer, etc.)
-    const activeProfilesCandidates = await Candidate.find({
-      status: { $nin: ['Rejected', 'Exited', 'Joined'] }
-    }).select('name phone email positionApplied clientName status jrNumber assignedRecruiterName updatedAt createdAt division').lean();
-
-    const activeProfilesReport = activeProfilesCandidates.map(c => {
-      const daysPending = Math.ceil((new Date() - new Date(c.updatedAt || c.createdAt)) / (1000 * 60 * 60 * 24));
-      return {
-        _id: c._id,
-        name: c.name,
-        phone: c.phone,
-        email: c.email,
-        positionApplied: c.positionApplied || '—',
-        clientName: c.clientName || '—',
-        status: c.status || 'Active',
-        jrNumber: c.jrNumber || '—',
-        recruiter: c.assignedRecruiterName || 'Unassigned',
-        division: c.division || 'BPO',
-        daysPending,
-        updatedAt: c.updatedAt || c.createdAt
-      };
-    }).sort((a, b) => b.daysPending - a.daysPending);
-
-    // 8. Expected Revenue (Customer wise, Division Wise)
-    const revenueCandidates = await Candidate.find({
-      status: { $in: ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed', 'Joined', 'Selected', 'Offer Accepted', 'Offered'] }
-    }).select('clientName division joiningSalary placementPercentage revenueGenerated status offerDetails').lean();
-
-    const customerRevMap = {};
-    const divisionRevMap = {};
-
-    revenueCandidates.forEach(c => {
-      const cust = c.clientName || 'General / Unspecified';
-      const div = c.division || 'BPO';
-
-      // Estimate revenue per candidate
-      let rev = parseFloat(c.revenueGenerated) || 0;
-      if (!rev && c.joiningSalary) {
-        const sal = parseFloat(c.joiningSalary) || 0;
-        const pct = parseFloat(c.placementPercentage) || 8.33;
-        rev = (sal * pct) / 100;
-      }
-      if (!rev && c.offerDetails && c.offerDetails.joiningSalary) {
-        const sal = parseFloat(c.offerDetails.joiningSalary) || 0;
-        const pct = parseFloat(c.offerDetails.placementPercentage) || 8.33;
-        rev = (sal * pct) / 100;
-      }
-      if (!rev) {
-        rev = 25000; // default estimated placement fee
-      }
-
-      const isJoined = c.status === 'Joined';
-      const isYetToJoin = ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed', 'Selected', 'Offer Accepted', 'Offered'].includes(c.status);
-
-      // Customer Map
-      if (!customerRevMap[cust]) {
-        customerRevMap[cust] = { customerName: cust, yetToJoinCount: 0, joinedCount: 0, expectedRevenue: 0, actualJoinedRevenue: 0 };
-      }
-      customerRevMap[cust].expectedRevenue += rev;
-      if (isJoined) {
-        customerRevMap[cust].joinedCount += 1;
-        customerRevMap[cust].actualJoinedRevenue += rev;
-      }
-      if (isYetToJoin) {
-        customerRevMap[cust].yetToJoinCount += 1;
-      }
-
-      // Division Map
-      if (!divisionRevMap[div]) {
-        divisionRevMap[div] = { division: div, yetToJoinCount: 0, joinedCount: 0, expectedRevenue: 0, actualJoinedRevenue: 0 };
-      }
-      divisionRevMap[div].expectedRevenue += rev;
-      if (isJoined) {
-        divisionRevMap[div].joinedCount += 1;
-        divisionRevMap[div].actualJoinedRevenue += rev;
-      }
-      if (isYetToJoin) {
-        divisionRevMap[div].yetToJoinCount += 1;
-      }
-    });
-
-    const customerExpectedRevenue = Object.values(customerRevMap).sort((a, b) => b.expectedRevenue - a.expectedRevenue);
-    const divisionExpectedRevenue = Object.values(divisionRevMap).sort((a, b) => b.expectedRevenue - a.expectedRevenue);
-    const totalExpectedRevenue = customerExpectedRevenue.reduce((sum, item) => sum + item.expectedRevenue, 0);
-
-    // 9. Lead and Recruiter Performance Report (Joinees vs Profiles Submitted, Joinees vs Selects)
-    const usersList = await User.find({ role: { $in: ['recruiter', 'tl', 'manager', 'admin'] } }).select('name role employeeId').lean();
-
-    const leadRecruiterPerformanceReport = await Promise.all(usersList.map(async (u) => {
-      const submitted = await Candidate.countDocuments({
-        $or: [{ assignedRecruiter: u._id }, { assignedRecruiterName: u.name }],
-        createdAt: { $gte: start, $lt: end }
-      });
-
-      const selects = await Candidate.countDocuments({
-        $or: [{ assignedRecruiter: u._id }, { assignedRecruiterName: u.name }],
-        createdAt: { $gte: start, $lt: end },
-        status: { $in: ['Selected', 'Offer Released', 'Offer Accepted', 'Yet To Join', 'Joined'] }
-      });
-
-      const joinees = await Candidate.countDocuments({
-        $or: [{ assignedRecruiter: u._id }, { assignedRecruiterName: u.name }],
-        createdAt: { $gte: start, $lt: end },
-        status: 'Joined'
-      });
-
-      const joineesVsSubmittedRatio = submitted > 0 ? `${((joinees / submitted) * 100).toFixed(1)}%` : '0.0%';
-      const joineesVsSelectsRatio = selects > 0 ? `${((joinees / selects) * 100).toFixed(1)}%` : '0.0%';
-
-      return {
-        userId: u._id,
-        name: u.name,
-        employeeId: u.employeeId || '—',
-        role: u.role === 'tl' ? 'Team Lead' : (u.role === 'recruiter' ? 'Recruiter' : u.role.toUpperCase()),
-        submitted,
-        selects,
-        joinees,
-        joineesVsSubmittedRatio,
-        joineesVsSelectsRatio,
-        rawSubmittedRatio: submitted > 0 ? (joinees / submitted) : 0,
-        rawSelectsRatio: selects > 0 ? (joinees / selects) : 0,
-      };
-    }));
-
-    const activeLeadRecruiterPerformance = leadRecruiterPerformanceReport
-      .filter(r => r.submitted > 0 || r.selects > 0 || r.joinees > 0)
-      .sort((a, b) => b.joinees - a.joinees || b.selects - a.selects || b.submitted - a.submitted);
-
     res.json({
       recruiterReport,
       customerReport,
@@ -1201,15 +774,7 @@ exports.advancedReports = async (req, res, next) => {
         avgStageAging,
         candidates: agingCandidates.slice(0, 100) // limit to top 100 for performance
       },
-      conversionReport,
-      activeJRsReport,
-      activeProfilesReport,
-      expectedRevenueReport: {
-        customerRevenue: customerExpectedRevenue,
-        divisionRevenue: divisionExpectedRevenue,
-        totalExpectedRevenue
-      },
-      leadRecruiterPerformanceReport: activeLeadRecruiterPerformance
+      conversionReport
     });
   } catch (err) {
     next(err);

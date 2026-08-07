@@ -7,12 +7,35 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS } from '../../utils/candidateStatusUtils';
 
 const SOURCES = ['Naukri', 'LinkedIn', 'Indeed', 'Walk-In', 'Referral', 'Monster', 'Company Website', 'Social Media', 'Other'];
 
-const STATUSES = [...CANDIDATE_STATUS_OPTIONS];
-const STATUS_COLORS: Record<string, string> = CANDIDATE_STATUS_COLORS;
+const STATUSES = [
+  'New', 'Screening', 'Contacted', 'Interested', 'Interview Scheduled',
+  'Selected', 'Rejected', 'Eligible Candidates', 'Wrong Number',
+  'Did Not Pick', 'Call Back', 'HR Shortlist', 'Written Test',
+  'Operations Round', 'Documentation', 'Yet To Join', 'Joined',
+];
+
+const STATUS_COLORS: Record<string, string> = {
+  'New': 'bg-slate-100 text-slate-600',
+  'Screening': 'bg-sky-100 text-sky-700',
+  'Contacted': 'bg-blue-100 text-blue-700',
+  'Interested': 'bg-cyan-100 text-cyan-700',
+  'Interview Scheduled': 'bg-violet-100 text-violet-700',
+  'Selected': 'bg-emerald-100 text-emerald-700',
+  'Rejected': 'bg-red-100 text-red-600',
+  'Eligible Candidates': 'bg-teal-100 text-teal-700',
+  'Wrong Number': 'bg-slate-200 text-slate-500',
+  'Did Not Pick': 'bg-orange-100 text-orange-600',
+  'Call Back': 'bg-amber-100 text-amber-700',
+  'HR Shortlist': 'bg-lime-100 text-lime-700',
+  'Written Test': 'bg-indigo-100 text-indigo-700',
+  'Operations Round': 'bg-purple-100 text-purple-700',
+  'Documentation': 'bg-sky-100 text-sky-700',
+  'Yet To Join': 'bg-yellow-100 text-yellow-700',
+  'Joined': 'bg-green-100 text-green-700',
+};
 
 const SOURCE_COLORS: Record<string, string> = {
   'Naukri': 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -33,15 +56,8 @@ export function CandidateDatabasePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-
-  const searchParams = new URLSearchParams(location.search);
-  const initialSource = searchParams.get('sourceFilter') || (location.state as any)?.sourceFilter || '';
-  const initialStatus = searchParams.get('statusFilter') || (location.state as any)?.statusFilter || '';
-  const initialStatusIn = searchParams.get('statusIn') || '';
-  const initialDivision = searchParams.get('division') || '';
-  const initialCompany = searchParams.get('clientName') || searchParams.get('company') || '';
-  const initialTlId = searchParams.get('tlId') || '';
-  const initialRecruiter = searchParams.get('recruiter') || '';
+  const stateFilter = (location.state as any)?.sourceFilter as string | undefined;
+  const stateStatusFilter = (location.state as any)?.statusFilter as string | undefined;
 
   // Role-based access: Only Admin and Manager can view candidate database
   useEffect(() => {
@@ -53,13 +69,8 @@ export function CandidateDatabasePage() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState(initialSource);
-  const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [statusInFilter, setStatusInFilter] = useState(initialStatusIn);
-  const [divisionFilter, setDivisionFilter] = useState(initialDivision);
-  const [companyFilter, setCompanyFilter] = useState(initialCompany);
-  const [tlFilter, setTlFilter] = useState(initialTlId);
-  const [recruiterFilter, setRecruiterFilter] = useState(initialRecruiter);
+  const [sourceFilter, setSourceFilter] = useState(stateFilter || '');
+  const [statusFilter, setStatusFilter] = useState(stateStatusFilter || '');
   const [reassignFilter, setReassignFilter] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -111,11 +122,6 @@ export function CandidateDatabasePage() {
       if (search) params.search = search;
       if (sourceFilter) params.source = sourceFilter;
       if (statusFilter) params.status = statusFilter;
-      if (statusInFilter) params.statusIn = statusInFilter;
-      if (divisionFilter && divisionFilter !== 'All') params.division = divisionFilter;
-      if (companyFilter && companyFilter !== 'All Companies') params.company = companyFilter;
-      if (tlFilter && tlFilter !== 'All Team Leaders') params.tlId = tlFilter;
-      if (recruiterFilter && recruiterFilter !== 'All Recruiters') params.recruiter = recruiterFilter;
       if (fromDate) params.fromDate = fromDate;
       if (toDate) params.toDate = toDate;
       
@@ -152,11 +158,6 @@ export function CandidateDatabasePage() {
       if (search) params.search = search;
       if (sourceFilter) params.source = sourceFilter;
       if (statusFilter) params.status = statusFilter;
-      if (statusInFilter) params.statusIn = statusInFilter;
-      if (divisionFilter && divisionFilter !== 'All') params.division = divisionFilter;
-      if (companyFilter && companyFilter !== 'All Companies') params.company = companyFilter;
-      if (tlFilter && tlFilter !== 'All Team Leaders') params.tlId = tlFilter;
-      if (recruiterFilter && recruiterFilter !== 'All Recruiters') params.recruiter = recruiterFilter;
       if (reassignFilter) params.reassignRequested = 'true';
       if (fromDate) params.fromDate = fromDate;
       if (toDate) params.toDate = toDate;
@@ -168,7 +169,7 @@ export function CandidateDatabasePage() {
     } finally {
       setLoading(false);
     }
-  }, [search, sourceFilter, statusFilter, statusInFilter, divisionFilter, companyFilter, tlFilter, recruiterFilter, reassignFilter, fromDate, toDate, page]);
+  }, [search, sourceFilter, statusFilter, reassignFilter, fromDate, toDate, page]);
 
   // Stats fetch (no filters)
   useEffect(() => {
@@ -190,25 +191,19 @@ export function CandidateDatabasePage() {
   useEffect(() => { fetchCandidates(); }, [fetchCandidates]);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [search, sourceFilter, statusFilter, statusInFilter, divisionFilter, companyFilter, tlFilter, recruiterFilter, reassignFilter, fromDate, toDate]);
+  useEffect(() => { setPage(1); }, [search, sourceFilter, statusFilter, reassignFilter, fromDate, toDate]);
 
   const clearFilters = () => {
     setSearch('');
     setSourceFilter('');
     setStatusFilter('');
-    setStatusInFilter('');
-    setDivisionFilter('');
-    setCompanyFilter('');
-    setTlFilter('');
-    setRecruiterFilter('');
     setReassignFilter(false);
     setFromDate('');
     setToDate('');
     setPage(1);
-    navigate('/admin/candidates', { replace: true });
   };
 
-  const hasFilters = !!(search || sourceFilter || statusFilter || statusInFilter || divisionFilter || companyFilter || tlFilter || recruiterFilter || reassignFilter || fromDate || toDate);
+  const hasFilters = !!(search || sourceFilter || statusFilter || reassignFilter || fromDate || toDate);
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -243,60 +238,28 @@ export function CandidateDatabasePage() {
           </div>
         </div>
 
-        {/* Stats Row Slicers */}
+        {/* Stats Row */}
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Total Candidates', value: stats.total, icon: Users, color: 'text-slate-700', bg: statusFilter === '' && !statusInFilter && !reassignFilter ? 'bg-slate-100 ring-2 ring-slate-400 shadow-sm' : 'bg-white', status: '' },
-            { label: 'Selected', value: stats.selected, icon: UserCheck, color: 'text-emerald-600', bg: statusFilter === 'Selected' ? 'bg-emerald-100 ring-2 ring-emerald-500 shadow-sm' : 'bg-white', status: 'Selected' },
-            { label: 'Joined', value: stats.joined, icon: UserCheck, color: 'text-green-600', bg: statusFilter === 'Joined' ? 'bg-green-100 ring-2 ring-green-500 shadow-sm' : 'bg-white', status: 'Joined' },
-            { label: 'Reassign Pending', value: stats.reassignPending, icon: RefreshCw, color: 'text-orange-500', bg: reassignFilter ? 'bg-orange-100 ring-2 ring-orange-400 shadow-sm' : 'bg-white', status: 'reassign' },
+            { label: 'Total Candidates', value: stats.total, icon: Users, color: 'text-slate-700', bg: 'bg-white', filter: false },
+            { label: 'Selected', value: stats.selected, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50', filter: false },
+            { label: 'Joined', value: stats.joined, icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50', filter: false },
+            { label: 'Reassign Pending', value: stats.reassignPending, icon: RefreshCw, color: 'text-orange-500', bg: reassignFilter ? 'bg-orange-100 ring-2 ring-orange-400' : 'bg-orange-50', filter: true },
           ].map((s, i) => (
             <div key={i}
-              onClick={() => {
-                setStatusInFilter('');
-                if (s.status === 'reassign') {
-                  setReassignFilter(f => !f);
-                  setStatusFilter('');
-                } else {
-                  setReassignFilter(false);
-                  setStatusFilter(s.status);
-                }
-              }}
-              className={`${s.bg} rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all`}>
-              <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
+              onClick={() => s.filter && setReassignFilter(f => !f)}
+              className={`${s.bg} rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3 ${s.filter ? 'cursor-pointer hover:bg-orange-100 transition-colors' : ''}`}>
+              <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center flex-shrink-0">
                 <s.icon className={`w-5 h-5 ${s.color}`} />
               </div>
               <div>
-                <p className="text-xl font-bold text-slate-800">{s.value}</p>
-                <p className="text-xs text-slate-500 font-medium">{s.label}</p>
+                <div className={`text-xl ${s.color}`} style={{ fontWeight: 700 }}>{s.value.toLocaleString()}</div>
+                <div className="text-slate-500 text-xs">{s.label}</div>
+                {s.filter && <div className="text-orange-400 text-xs">{reassignFilter ? 'Click to clear' : 'Click to filter'}</div>}
               </div>
             </div>
           ))}
         </div>
-
-        {/* Active Filter Notification Bar */}
-        {hasFilters && (
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2 flex-wrap text-sm font-semibold text-emerald-900">
-              <Filter className="w-4 h-4 text-emerald-600" />
-              <span>Active Filter:</span>
-              {statusInFilter && <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">Stage Filter Active</span>}
-              {statusFilter && <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">Status: {statusFilter}</span>}
-              {divisionFilter && <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold border border-blue-300">Division: {divisionFilter}</span>}
-              {companyFilter && <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-bold border border-purple-300">Company: {companyFilter}</span>}
-              {tlFilter && <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300">TL Filter Active</span>}
-              {recruiterFilter && <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-300">Recruiter Filter Active</span>}
-              {reassignFilter && <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-xs font-bold border border-orange-300">Reassign Pending</span>}
-              <span className="text-emerald-700 text-xs font-medium">({pagination.total || candidates.length} candidates found)</span>
-            </div>
-            <button
-              onClick={clearFilters}
-              className="text-xs text-red-600 font-bold hover:text-red-700 flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-red-200 hover:bg-red-50 transition-all cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" /> Clear Filters
-            </button>
-          </div>
-        )}
 
         {/* Filters */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-wrap gap-3 items-center">
@@ -579,44 +542,18 @@ export function CandidateDatabasePage() {
 
           {/* Pagination */}
           {pagination.pages > 1 && (
-            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 pr-20 bg-slate-50/50">
-              <div className="text-xs text-slate-500 font-medium">
-                Showing Page <span className="font-bold text-slate-800">{page}</span> of <span className="font-bold text-slate-800">{pagination.pages}</span> ({pagination.total?.toLocaleString() || 0} total candidates)
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => p - 1)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Previous</span>
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Page {page} of {pagination.pages} · {pagination.total.toLocaleString()} total
+              </span>
+              <div className="flex gap-1">
+                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600 transition-colors">
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-
-                {/* Page Number Pills */}
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: pagination.pages }, (_, idx) => idx + 1).map(pNum => (
-                    <button
-                      key={pNum}
-                      onClick={() => setPage(pNum)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        page === pNum
-                          ? 'bg-green-600 text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {pNum}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  disabled={page >= pagination.pages}
-                  onClick={() => setPage(p => p + 1)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all shadow-2xs"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                <button disabled={page >= pagination.pages} onClick={() => setPage(p => p + 1)}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-slate-100 text-slate-600 transition-colors">
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
