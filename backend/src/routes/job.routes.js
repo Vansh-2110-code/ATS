@@ -13,8 +13,8 @@ router.get('/:id', ctrl.getById);
 // Bulk create — must be before /:id
 router.post('/bulk', authorize('tl', 'admin', 'manager'), uploadImport.single('file'), ctrl.bulkCreate);
 router.post('/', authorize('tl', 'admin', 'manager'), uploadJD.single('jdFile'), ctrl.create);
-// Admin and Manager can make final edits to posted jobs
-router.put('/:id', authorize('admin', 'manager'), uploadJD.single('jdFile'), ctrl.update);
+// Admin, Manager, and TL can edit posted jobs
+router.put('/:id', authorize('tl', 'admin', 'manager'), uploadJD.single('jdFile'), ctrl.update);
 router.delete('/:id', authorize('admin'), ctrl.remove);
 router.post('/:id/extract-keywords', authorize('tl', 'admin', 'manager'), ctrl.extractKeywords);
 

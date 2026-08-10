@@ -9,6 +9,12 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { calculateAge } from '../../utils/ageCalculator';
+<<<<<<< HEAD
+=======
+import { dedupeCompanies } from '../../utils/companyUtils';
+import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS, isTLOnlyStatus } from '../../utils/candidateStatusUtils';
+import { CopyableContact } from '../../components/CopyableContact';
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 
 const API_BASE = window.location.origin;
 
@@ -281,7 +287,7 @@ export function CandidateProfilePage() {
   }, [id]);
 
   useEffect(() => {
-    const shouldFetchUsers = (isAdmin && reassignOpen) || (isTLOrAdmin && tagOpen);
+    const shouldFetchUsers = ((isAdmin || isTL || isManager) && reassignOpen) || (isTLOrAdmin && tagOpen);
     if (shouldFetchUsers || showJoiningModal || isAdmin) {
       api.getCompanies().then(d => {
         setCompanies(d.companies || []);
@@ -290,7 +296,7 @@ export function CandidateProfilePage() {
         }
       }).catch(() => {});
     }
-  }, [isAdmin, reassignOpen, isTLOrAdmin, tagOpen, showJoiningModal]);
+  }, [isAdmin, isTL, isManager, reassignOpen, isTLOrAdmin, tagOpen, showJoiningModal]);
 
   // Sync tagRecruiterId when panel opens
   useEffect(() => {
@@ -703,7 +709,7 @@ export function CandidateProfilePage() {
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Resumes
         </button>
-        {(isAdmin || isTL || isManager) && (
+        {(isAdmin || isTL || isManager || isRecruiter) && (
           <button
             onClick={() => navigate(`/recruiter/add?id=${id}`)}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-xl transition-all shadow-sm font-semibold"
@@ -845,8 +851,8 @@ export function CandidateProfilePage() {
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
-                  {candidate.email && <div className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-slate-400" />{candidate.email}</div>}
-                  {candidate.phone && <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-slate-400" />{candidate.phone}</div>}
+                  {candidate.email && <CopyableContact type="email" value={candidate.email} />}
+                  {candidate.phone && <CopyableContact type="phone" value={candidate.phone} />}
                   {candidate.experience && <div className="flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-slate-400" />{candidate.experience}</div>}
                   {(candidate.city || candidate.location) && (
                     <div className="flex items-center gap-1.5">
@@ -1926,8 +1932,8 @@ export function CandidateProfilePage() {
             </div>
           )}
 
-          {/* ── Admin: Reassign Panel ─────────────────────────── */}
-          {isAdmin && (
+          {/* ── Admin / TL: Reassign Panel ─────────────────────────── */}
+          {(isAdmin || isTL || isManager) && (
             <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
               <button onClick={() => setReassignOpen(o => !o)}
                 className="w-full flex items-center justify-between text-left">

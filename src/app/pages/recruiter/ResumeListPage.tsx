@@ -4,9 +4,16 @@ import {
   Search, Filter, Eye, ChevronDown, X, UserPlus, Columns, Check,
   MapPin, Loader2, Download, Upload, FileSpreadsheet, Printer,
   FileDown, CheckCircle2, AlertCircle, Lock, Mail, MessageSquare,
+  Edit3, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+<<<<<<< HEAD
+=======
+import { dedupeCompanies } from '../../utils/companyUtils';
+import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS } from '../../utils/candidateStatusUtils';
+import { CopyableContact } from '../../components/CopyableContact';
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 
 const API_BASE = window.location.origin;
 
@@ -70,6 +77,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isTLOrAdminOrManager = ['admin', 'tl', 'manager'].includes(user?.role || '');
   const locationState = location.state as { statusFilter?: string; todayCalls?: boolean } | null;
 
   const [search, setSearch] = useState('');
@@ -80,6 +88,15 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const [showFilters, setShowFilters] = useState(false);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Reassign Modal State
+  const [reassignModalOpen, setReassignModalOpen] = useState(false);
+  const [reassignCand, setReassignCand] = useState<any>(null);
+  const [reassignRecruiterId, setReassignRecruiterId] = useState('');
+  const [reassignRecruiterName, setReassignRecruiterName] = useState('');
+  const [reassignReason, setReassignReason] = useState('');
+  const [reassigning, setReassigning] = useState(false);
+  const [reassignError, setReassignError] = useState('');
 
   // Column visibility
   const [visibleCols, setVisibleCols] = useState<Record<ColKey, boolean>>(
@@ -110,6 +127,39 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const [waCandidate, setWaCandidate] = useState<any | null>(null);
   const [waTemplate, setWaTemplate] = useState('invite');
   const [waCustomText, setWaCustomText] = useState('');
+
+  // Reassign submit handler
+  const handleOpenReassignModal = (cand: any) => {
+    setReassignCand(cand);
+    setReassignRecruiterId('');
+    setReassignRecruiterName('');
+    setReassignReason('');
+    setReassignError('');
+    setReassignModalOpen(true);
+  };
+
+  const handleReassignSubmit = async () => {
+    if (!reassignCand?.id) return;
+    if (!reassignRecruiterId) { setReassignError('Select a recruiter'); return; }
+    if (!reassignReason.trim()) { setReassignError('Reason is required'); return; }
+    setReassignError('');
+    setReassigning(true);
+    try {
+      await api.reassignCandidate(reassignCand.id, {
+        newRecruiterId: reassignRecruiterId,
+        newRecruiterName: reassignRecruiterName,
+        reason: reassignReason,
+      });
+      // Refresh candidates list
+      setCandidates(prev => prev.map(c => c.id === reassignCand.id ? { ...c, recruiter: reassignRecruiterName } : c));
+      setReassignModalOpen(false);
+      alert(`Candidate ${reassignCand.name} reassigned to ${reassignRecruiterName} successfully.`);
+    } catch (err: any) {
+      setReassignError(err.message || 'Failed to reassign candidate');
+    } finally {
+      setReassigning(false);
+    }
+  };
 
   const getWaMessage = (temp: string, cand: any) => {
     if (!cand) return '';
@@ -174,7 +224,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
           skills: Array.isArray(c.skills) ? c.skills.join(', ') : (c.skills || ''),
           exp: c.experience || '',
           source: c.source || '',
-          status: c.status || 'New',
+          status: c.status || 'Eligible',
           email: c.email || '',
           city: c.city || '',
           localArea: c.localArea || '',
@@ -711,23 +761,26 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
         )}
       </div>
 
-      {/* Status Quick Filters */}
+      {/* Status Quick Filters (Official 32 Candidate Statuses) */}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setStatusFilter('All Status')}
-          className={`text-xs px-3 py-1.5 rounded-full transition-opacity bg-slate-100 text-slate-600 ${statusFilter === 'All Status' ? 'ring-2 ring-offset-1 ring-green-400' : ''}`}
+          className={`text-xs px-3 py-1.5 rounded-full transition-opacity bg-slate-100 text-slate-600 ${statusFilter === 'All Status' ? 'ring-2 ring-offset-1 ring-green-400 font-semibold' : ''}`}
           style={{ fontWeight: 500 }}
         >
           All ({candidates.length})
         </button>
-        {Object.entries(STATUS_COLORS).map(([status, color]) => {
-          const count = candidates.filter(c => c.status === status).length;
-          if (!count) return null;
+        {CANDIDATE_STATUS_OPTIONS.map((status) => {
+          const color = CANDIDATE_STATUS_COLORS[status] || 'bg-slate-100 text-slate-600 border-slate-200';
+          const count = candidates.filter(c => {
+            if (status === 'Eligible') return c.status === 'Eligible' || c.status === 'Eligible Candidates';
+            return c.status === status;
+          }).length;
           return (
             <button
               key={status}
               onClick={() => setStatusFilter(statusFilter === status ? 'All Status' : status)}
-              className={`text-xs px-3 py-1.5 rounded-full transition-opacity ${color} ${statusFilter === status ? 'ring-2 ring-offset-1 ring-green-400' : ''}`}
+              className={`text-xs px-3 py-1.5 rounded-full transition-opacity border ${color} ${statusFilter === status ? 'ring-2 ring-offset-1 ring-green-400 font-semibold' : ''}`}
               style={{ fontWeight: 500 }}
             >
               {status} ({count})
@@ -815,7 +868,8 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                           <p className="text-slate-700 text-sm" style={{ fontWeight: 500 }}>
                             {c.name} {c.candidateId && <span className="text-[10px] text-slate-400 font-normal ml-1">({c.candidateId})</span>}
                           </p>
-                          <p className="text-slate-400 text-xs">{c.email}</p>
+                          {c.email ? <CopyableContact type="email" value={c.email} className="text-slate-400 text-xs" showIcon={false} /> : null}
+                          {c.phone ? <CopyableContact type="phone" value={c.phone} className="text-slate-400 text-xs" showIcon={false} /> : null}
                         </div>
                       </div>
                     </td>
@@ -868,7 +922,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                   )}
                   {visibleCols.action && (
                     <td className="px-5 py-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
                         <Link
                           to={`/recruiter/candidate/${c.id}`}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-green-50 text-green-600 text-xs rounded-lg hover:bg-green-100 transition-colors"
@@ -878,6 +932,26 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                           <Eye className="w-3.5 h-3.5" />
                           View
                         </Link>
+                        <Link
+                          to={`/recruiter/add?id=${c.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-xs rounded-lg hover:bg-blue-100 transition-colors"
+                          style={{ fontWeight: 500 }}
+                          title="Edit Profile"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          Edit
+                        </Link>
+                        {isTLOrAdminOrManager && (
+                          <button
+                            onClick={() => handleOpenReassignModal(c)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-orange-50 text-orange-600 text-xs rounded-lg hover:bg-orange-100 transition-colors cursor-pointer"
+                            style={{ fontWeight: 500 }}
+                            title="Reassign Candidate"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Reassign
+                          </button>
+                        )}
                         {c.resumePath ? (
                           <a
                             href={`${API_BASE}${c.resumePath}`}
@@ -942,6 +1016,10 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                         {[c.city, c.localArea].filter(Boolean).join(', ')}
                       </p>
                     )}
+                    <div className="flex flex-wrap gap-2 mt-1.5">
+                      {c.email && <CopyableContact type="email" value={c.email} className="text-slate-400 text-xs" showIcon={true} />}
+                      {c.phone && <CopyableContact type="phone" value={c.phone} className="text-slate-400 text-xs" showIcon={true} />}
+                    </div>
                   </div>
                 </div>
                 <span className={`text-xs px-2.5 py-1 rounded-full flex-shrink-0 ${STATUS_COLORS[c.status] ?? 'bg-slate-100 text-slate-600'}`} style={{ fontWeight: 500 }}>
@@ -950,7 +1028,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
               </div>
               <p className="text-slate-500 text-xs mt-2 ml-13">{c.skills}</p>
               <p className="text-slate-400 text-xs mt-1 ml-13">Assigned to: <strong className="text-slate-600">{c.recruiter || 'Unassigned'}</strong></p>
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex items-center justify-end gap-2 flex-wrap">
                 <Link
                   to={`/recruiter/candidate/${c.id}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 text-xs rounded-lg"
@@ -958,6 +1036,22 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                 >
                   <Eye className="w-3.5 h-3.5" /> View Profile
                 </Link>
+                <Link
+                  to={`/recruiter/add?id=${c.id}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 text-xs rounded-lg"
+                  style={{ fontWeight: 500 }}
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                </Link>
+                {isTLOrAdminOrManager && (
+                  <button
+                    onClick={() => handleOpenReassignModal(c)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 text-xs rounded-lg cursor-pointer"
+                    style={{ fontWeight: 500 }}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Reassign
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -1114,6 +1208,81 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors"
               >
                 Open WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Reassign Candidate Modal (TL / Admin / Manager) ── */}
+      {reassignModalOpen && reassignCand && (
+        <div className="fixed inset-0 bg-slate-950/45 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-orange-500 animate-spin-once" />
+                <h3 className="text-slate-800" style={{ fontWeight: 700 }}>Reassign Candidate</h3>
+              </div>
+              <button onClick={() => setReassignModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 text-xs text-orange-800 space-y-1">
+                <p className="font-semibold">Candidate: {reassignCand.name}</p>
+                <p>Current Recruiter: <strong className="text-slate-700">{reassignCand.recruiter || 'Unassigned'}</strong></p>
+                <p className="text-orange-600 mt-1">Reassigning will reset all workflow stages and assign to the new recruiter.</p>
+              </div>
+
+              {reassignError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">
+                  {reassignError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Assign To Recruiter *</label>
+                <select
+                  value={reassignRecruiterId}
+                  onChange={e => {
+                    setReassignRecruiterId(e.target.value);
+                    setReassignRecruiterName(e.target.options[e.target.selectedIndex].text);
+                  }}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:border-orange-400"
+                >
+                  <option value="">— Select Recruiter —</option>
+                  {recruiterList.map((r: any) => {
+                    const rId = r._id || r.id;
+                    const rName = r.name || r.userName || r.email || r;
+                    return <option key={rId} value={rId}>{rName}</option>;
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Reason for Reassignment *</label>
+                <textarea
+                  rows={3}
+                  value={reassignReason}
+                  onChange={e => setReassignReason(e.target.value)}
+                  placeholder="Enter reason for reassigning candidate..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-400 bg-slate-50 resize-none"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-2 justify-end flex-shrink-0">
+              <button
+                disabled={reassigning}
+                onClick={() => setReassignModalOpen(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={reassigning || !reassignRecruiterId || !reassignReason.trim()}
+                onClick={handleReassignSubmit}
+                className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+              >
+                {reassigning ? 'Reassigning...' : 'Reassign Candidate'}
               </button>
             </div>
           </div>

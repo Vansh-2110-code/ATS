@@ -123,10 +123,37 @@ exports.create = async (req, res, next) => {
     if (!data.recruiterName) data.recruiterName = req.user.name;
     if (!data.recruiterEmail) data.recruiterEmail = req.user.email;
 
-    // Auto-generate JR Number if not provided: JRWH0001, JRWH0002, ...
+    // Prevent duplicate JR creation for same company and job title
+    const companyName = (data.companyName || data.client || '').trim();
+    const jobTitle = (data.jobTitle || '').trim();
+
+    if (companyName && jobTitle) {
+      const escapeRegex = str => str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const existingJob = await Job.findOne({
+        $or: [
+          { companyName: { $regex: `^${escapeRegex(companyName)}$`, $options: 'i' } },
+          { client: { $regex: `^${escapeRegex(companyName)}$`, $options: 'i' } }
+        ],
+        jobTitle: { $regex: `^${escapeRegex(jobTitle)}$`, $options: 'i' },
+        status: { $ne: 'Closed' }
+      });
+
+      if (existingJob) {
+        return res.status(400).json({
+          message: `An active Job Requisition already exists for ${companyName} - ${jobTitle} (JR Number: ${existingJob.jrNumber}). Duplicate JR creation is not allowed.`
+        });
+      }
+    }
+
+    // Auto-generate JR Number if not provided: JRWH0001, JRWH0002, ... (max numeric suffix safe)
     if (!data.jrNumber) {
-      const count = await Job.countDocuments();
-      data.jrNumber = `JRWH${String(count + 1).padStart(4, '0')}`;
+      const allJobs = await Job.find({ jrNumber: /^JRWH\d+$/i }).select('jrNumber').lean();
+      let maxNum = 0;
+      allJobs.forEach(j => {
+        const num = parseInt(j.jrNumber.replace(/^JRWH/i, ''), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      });
+      data.jrNumber = `JRWH${String(maxNum + 1).padStart(4, '0')}`;
     }
 
     const job = await Job.create(data);
@@ -271,18 +298,46 @@ exports.bulkCreate = async (req, res, next) => {
       return res.status(400).json({ message: 'Maximum 100 jobs per bulk post' });
     }
 
-    const baseCount = await Job.countDocuments();
+    const allJobs = await Job.find({ jrNumber: /^JRWH\d+$/i }).select('jrNumber').lean();
+    let maxNum = 0;
+    allJobs.forEach(j => {
+      const num = parseInt(j.jrNumber.replace(/^JRWH/i, ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+
     const created = [];
     const failed = [];
 
+    const escapeRegex = str => str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
     for (let i = 0; i < jobs.length; i++) {
       const jobData = { ...jobs[i] };
-      if (!jobData.companyName || !jobData.jobTitle) {
-        failed.push({ row: i + 1, error: 'companyName and jobTitle are required', jobTitle: jobData.jobTitle || '(empty)' });
+      const companyName = (jobData.companyName || jobData.client || '').trim();
+      const jobTitle = (jobData.jobTitle || '').trim();
+
+      if (!companyName || !jobTitle) {
+        failed.push({ row: i + 1, error: 'companyName and jobTitle are required', jobTitle: jobTitle || '(empty)' });
         continue;
       }
+
+      // Check if duplicate open job exists
+      const existingJob = await Job.findOne({
+        $or: [
+          { companyName: { $regex: `^${escapeRegex(companyName)}$`, $options: 'i' } },
+          { client: { $regex: `^${escapeRegex(companyName)}$`, $options: 'i' } }
+        ],
+        jobTitle: { $regex: `^${escapeRegex(jobTitle)}$`, $options: 'i' },
+        status: { $ne: 'Closed' }
+      });
+
+      if (existingJob) {
+        failed.push({ row: i + 1, error: `Duplicate active JR already exists (${existingJob.jrNumber})`, jobTitle });
+        continue;
+      }
+
       try {
-        jobData.jrNumber  = `JRWH${String(baseCount + created.length + 1).padStart(4, '0')}`;
+        maxNum++;
+        jobData.jrNumber  = `JRWH${String(maxNum).padStart(4, '0')}`;
         jobData.createdBy = req.user._id;
         if (!jobData.recruiterName) jobData.recruiterName = req.user.name;
         if (!jobData.recruiterEmail) jobData.recruiterEmail = req.user.email;
@@ -291,7 +346,7 @@ exports.bulkCreate = async (req, res, next) => {
         const doc = await Job.create(jobData);
         created.push({ _id: doc._id, jrNumber: doc.jrNumber, jobTitle: doc.jobTitle, companyName: doc.companyName });
       } catch (err) {
-        failed.push({ row: i + 1, error: err.message, jobTitle: jobData.jobTitle });
+        failed.push({ row: i + 1, error: err.message, jobTitle: jobTitle });
       }
     }
 

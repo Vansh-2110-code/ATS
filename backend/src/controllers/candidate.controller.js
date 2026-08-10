@@ -137,124 +137,70 @@ exports.list = async (req, res, next) => {
       }
     }
 
-    // Team Leader Filter (resolve TL team members)
-    if (tlId && tlId !== 'All Team Leaders' && !recruiter) {
+    // Team Leader / Recruiter Filter
+    const isAllRecruiters = !recruiter || recruiter === 'All Recruiters' || recruiter === 'All';
+    const isAllTls = !tlId || tlId === 'All Team Leaders' || tlId === 'All';
+
+    if (!isAllTls && isAllRecruiters) {
       const TeamMember = require('../models/TeamMember');
       const User = require('../models/User');
       const mongoose = require('mongoose');
 
-      const tlUser = await User.findOne({
-        $or: [
-          { _id: mongoose.Types.ObjectId.isValid(tlId) ? tlId : null },
-          { name: tlId }
-        ]
-      }).select('_id name');
-      const targetTlId = tlUser ? tlUser._id : tlId;
-      const targetTlName = tlUser ? tlUser.name : tlId;
+      let targetTlId = null;
+      let targetTlName = null;
 
-      const teamAssigned = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null }).lean();
-      const memberIds = teamAssigned.map(m => m.memberId).filter(Boolean);
-      const userIds = [targetTlId, ...memberIds];
-
-      const memberUsers = await User.find({ _id: { $in: userIds } }).select('_id name');
-      const userNames = memberUsers.map(u => u.name).filter(Boolean);
-      if (targetTlName && !userNames.includes(targetTlName)) userNames.push(targetTlName);
-
-      const tlUserCond = [
-        { assignedRecruiter: { $in: userIds } },
-        { assignedRecruiterName: { $in: userNames } }
-      ];
-
-      if (query.$or) {
-        query.$and = [{ $or: query.$or }, { $or: tlUserCond }];
-        delete query.$or;
+      if (mongoose.Types.ObjectId.isValid(tlId)) {
+        targetTlId = tlId;
+        const u = await User.findById(tlId).select('name');
+        if (u) targetTlName = u.name;
       } else {
-        query.$or = tlUserCond;
-      }
-    }
-
-    let accessCondition = null;
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-    // Explicit per-recruiter filter (used by TL My Team view)
-    // Admin or TL can pass ?recruiter=<userId> to get only that recruiter's candidates
-    if (recruiter && (req.user.role === 'tl' || req.user.role === 'admin' || req.user.role === 'manager')) {
-      if (req.user.role === 'tl') {
-        const TeamMember = require('../models/TeamMember');
-        const isMember = await TeamMember.findOne({
-          teamLeaderId: req.user._id,
-          memberId: recruiter,
-          removedAt: null
-        });
-        const isSelf = String(recruiter) === String(req.user._id);
-        if (!isMember && !isSelf) {
-          return res.status(403).json({ message: 'Access denied: Recruiter is not on your team.' });
+        const u = await User.findOne({ name: tlId }).select('_id name');
+        if (u) {
+          targetTlId = u._id;
+          targetTlName = u.name;
+        } else {
+          targetTlName = tlId;
         }
       }
-      query.assignedRecruiter = recruiter;
-    } else {
-      // Role-based data visibility (fallback when no explicit recruiter param)
-      if (req.user.role === 'recruiter' && source !== 'Walk-In') {
-        accessCondition = {
-          $or: [
-            { assignedRecruiter: req.user._id },
-            { ownershipStatus: 'General Data' },
-            { assignedAt: { $lt: thirtyDaysAgo } },
-            { ownershipStatus: 'Expired' }
-          ]
-        };
-      } else if (req.user.role === 'tl') {
-        const TeamMember = require('../models/TeamMember');
-        const teamMembers = await TeamMember.find({
-          teamLeaderId: req.user._id,
-          removedAt: null,
-        }).select('memberId');
 
-        const memberIds = teamMembers.map(t => t.memberId);
-        memberIds.push(req.user._id); // Include TL's own candidates if assigned any
+      let userIds = [];
+      let userNames = [];
 
-        accessCondition = {
-          $or: [
-            { assignedRecruiter: { $in: memberIds } },
-            { ownershipStatus: 'General Data' },
-            { assignedAt: { $lt: thirtyDaysAgo } },
-            { ownershipStatus: 'Expired' }
-          ]
-        };
-      } else if (req.user.role === 'manager') {
-        const User = require('../models/User');
-        const TeamMember = require('../models/TeamMember');
+      if (targetTlId) {
+        userIds.push(targetTlId);
+        const teamAssigned = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null }).lean();
+        const memberIds = teamAssigned.map(m => m.memberId).filter(Boolean);
+        userIds.push(...memberIds);
 
-        const tlUsers = await User.find({ role: 'tl' }).select('_id');
-        const tlIds = tlUsers.map(t => t._id);
-
-        const allTeamMembers = await TeamMember.find({
-          teamLeaderId: { $in: tlIds },
-          removedAt: null,
-        }).select('memberId');
-
-        const recruiterIds = allTeamMembers.map(t => t.memberId);
-        recruiterIds.push(...tlIds);
-        recruiterIds.push(req.user._id);
-
-        accessCondition = {
-          $or: [
-            { assignedRecruiter: { $in: recruiterIds } },
-            { ownershipStatus: 'General Data' },
-            { assignedAt: { $lt: thirtyDaysAgo } },
-            { ownershipStatus: 'Expired' }
-          ]
-        };
+        const memberUsers = await User.find({ _id: { $in: userIds } }).select('_id name');
+        userNames = memberUsers.map(u => u.name).filter(Boolean);
       }
-      // Admin sees all - no filter applied
-    }
+      if (targetTlName && !userNames.includes(targetTlName)) userNames.push(targetTlName);
 
-    if (accessCondition) {
-      if (query.$or) {
-        query.$and = [{ $or: query.$or }, accessCondition];
-        delete query.$or;
+      const tlUserCond = [];
+      if (userIds.length > 0) tlUserCond.push({ assignedRecruiter: { $in: userIds } });
+      if (userNames.length > 0) tlUserCond.push({ assignedRecruiterName: { $in: userNames } });
+
+      if (tlUserCond.length > 0) {
+        if (query.$or) {
+          query.$and = [{ $or: query.$or }, { $or: tlUserCond }];
+          delete query.$or;
+        } else {
+          query.$or = tlUserCond;
+        }
+      }
+    } else if (!isAllRecruiters && (req.user.role === 'tl' || req.user.role === 'admin' || req.user.role === 'manager')) {
+      const mongoose = require('mongoose');
+      const User = require('../models/User');
+      if (mongoose.Types.ObjectId.isValid(recruiter)) {
+        query.assignedRecruiter = recruiter;
       } else {
-        Object.assign(query, accessCondition);
+        const recUser = await User.findOne({ name: recruiter }).select('_id name');
+        if (recUser) {
+          query.assignedRecruiter = recUser._id;
+        } else {
+          query.assignedRecruiterName = recruiter;
+        }
       }
     }
 
@@ -268,8 +214,9 @@ exports.list = async (req, res, next) => {
       'Rejected – Interview Round', 'Rejected – Second Round'
     ];
 
-    // Item 7: Move candidates > 30 days cooling period to General Data and untag from specific recruiter
-    await Candidate.updateMany(
+    // Item 7: Move candidates > 30 days cooling period to General Data (fire-and-forget, non-blocking)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    Candidate.updateMany(
       {
         ownershipStatus: { $ne: 'General Data' },
         $or: [
@@ -284,7 +231,7 @@ exports.list = async (req, res, next) => {
           assignedRecruiterName: 'General Pool'
         } 
       }
-    );
+    ).catch(e => console.error('[cooling-period] updateMany error:', e));
 
     const [candidates, total] = await Promise.all([
       Candidate.find(query)
@@ -330,29 +277,7 @@ exports.getById = async (req, res, next) => {
       await candidate.save();
     }
 
-    // Role-based visibility check
-    const isOwner = String(candidate.assignedRecruiter?._id || candidate.assignedRecruiter || '') === String(req.user._id);
-    
-    if (req.user.role === 'recruiter') {
-      const isGeneral = candidate.ownershipStatus === 'General Data';
-      const isWalkIn = candidate.source === 'Walk-In';
-      if (!isOwner && !isGeneral && !isExpired && !isWalkIn) {
-        return res.status(403).json({ message: 'Access denied: Candidate is assigned to another recruiter and is under 30-day validity.' });
-      }
-    } else if (req.user.role === 'tl') {
-      const TeamMember = require('../models/TeamMember');
-      const teamMember = await TeamMember.findOne({
-        teamLeaderId: req.user._id,
-        memberId: candidate.assignedRecruiter?._id || candidate.assignedRecruiter,
-        removedAt: null,
-      });
-      const isGeneral = candidate.ownershipStatus === 'General Data';
-      const isWalkIn = candidate.source === 'Walk-In';
-      if (!isOwner && !teamMember && !isGeneral && !isExpired && !isWalkIn) {
-        return res.status(403).json({ message: 'Access denied: You do not have permission to view this candidate.' });
-      }
-    }
-
+    // Everyone (Recruiter, Team Lead, Manager, Admin) can view candidate details
     res.json(candidate);
   } catch (err) {
     next(err);
@@ -2096,6 +2021,19 @@ exports.createOrUpdateJoiningForm = async (req, res, next) => {
     }
 
     const updateData = { ...b };
+
+    // Clean empty string values for dates and numbers to prevent Mongoose CastErrors
+    if (!updateData.joiningDate || updateData.joiningDate === '') {
+      updateData.joiningDate = new Date();
+    }
+    if (updateData.dateOfBirth === '') {
+      delete updateData.dateOfBirth;
+    }
+    ['trainingDurationDays', 'expYears', 'expMonths', 'age'].forEach(f => {
+      if (updateData[f] === '' || updateData[f] === 'undefined' || updateData[f] === 'null' || updateData[f] === 'NaN') {
+        delete updateData[f];
+      }
+    });
 
     // Parse JSON fields (Frontend sends them as strings in FormData)
     if (b.educationQualifications) try { updateData.educationQualifications = JSON.parse(b.educationQualifications); } catch (e) { }

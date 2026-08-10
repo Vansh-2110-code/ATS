@@ -43,7 +43,6 @@ export const GLOBAL_STATUSES = [
 export const CANDIDATE_STATUS_OPTIONS = [
   ...RECRUITER_STATUSES,
   ...TL_MANAGEMENT_STATUSES,
-  ...GLOBAL_STATUSES,
 ] as const;
 
 export type CandidateStatus = typeof CANDIDATE_STATUS_OPTIONS[number];

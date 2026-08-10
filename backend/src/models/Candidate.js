@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const CANDIDATE_STATUSES = [
+<<<<<<< HEAD
   'New', 'Contacted', 'Interested', 'Selected for Call', 'Screening',
   'Interview Scheduled', 'Selected', 'Rejected',
   'Eligible Candidates', 'Wrong Number', 'Unreachable',
@@ -8,6 +9,25 @@ const CANDIDATE_STATUSES = [
   'HR Shortlist', 'Written Test', 'Operations Round',
   'Document Pending', 'Documentation', 'Yet To Join', 'Joined',
   'Walk-in Submitted', 'Exited'
+=======
+  // Official Statuses
+  'Eligible', 'Not Eligible', 'Not Interested', 'No Response', 'Duplicate-Client', 'Call Back',
+  'Hold', 'Submitted To Client', 'Submitted to Client', 'Sublitted To Client', 'Walkin Company', 'Walkin WHM',
+  'No Show', 'VNA Select', 'VNA Reject', 'Test Select', 'Test Reject',
+  'Candidate Drop Post L1 Select', 'Candidate Drop Post L2 Select',
+  'Candidate Drop During Final Stage', 'L1 Select', 'L1 Reject', 'L2 Select',
+  'L2 Reject', 'Final Select', 'Final Reject', 'Document Initialized',
+  'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete',
+  'Waiting for Offer', 'Offer Accept', 'Offer Reject', 'Joined',
+  'Joined and Abort', 'Black List',
+
+  // Legacy Statuses (for backward compatibility)
+  'Contacted', 'Interested', 'Selected for Call', 'Screening',
+  'Interview Scheduled', 'Selected', 'Rejected', 'Eligible Candidates',
+  'Wrong Number', 'Unreachable', 'Did Not Pick', 'Unanswered Calls',
+  'HR Shortlist', 'Written Test', 'Operations Round', 'Document Pending',
+  'Documentation', 'Yet To Join', 'Walk-in Submitted', 'Exited', 'New'
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 ];
 
 const SOURCES = [
@@ -87,7 +107,7 @@ const candidateSchema = new mongoose.Schema({
   source: { type: String, default: 'Other' },
   linkedin: { type: String, trim: true },
   portfolio: { type: String, trim: true },
-  status: { type: String, enum: CANDIDATE_STATUSES, default: 'New' },
+  status: { type: String, enum: CANDIDATE_STATUSES, default: 'Eligible' },
   exitDate: { type: Date },
   resumePath: { type: String },
   resumeOriginalName: { type: String },

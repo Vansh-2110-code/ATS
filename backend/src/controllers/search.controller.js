@@ -44,7 +44,7 @@ const buildDynamicQuery = (model, q) => {
 };
 
 const buildCandidateVisibilityQuery = async (user) => {
-  // Requirement 6: Everyone should be able to search candidates by Mobile no, Mail id, Skills, Name in Global Search
+  // Everyone (Recruiter, Team Lead, Manager, Admin) can search all candidates
   return {};
 };
 
@@ -87,7 +87,7 @@ const formatCandidateResult = (candidate) => ({
   type: 'candidate',
   module: 'Candidates',
   title: candidate.name || 'Unnamed Candidate',
-  subtitle: [candidate.phone, candidate.email, candidate.status].filter(Boolean).join(' • '),
+  subtitle: [candidate.phone, candidate.email, candidate.positionApplied, candidate.clientName, candidate.status, candidate.assignedRecruiterName ? `Recruiter: ${candidate.assignedRecruiterName}` : ''].filter(Boolean).join(' • '),
   path: `/recruiter/candidate/${candidate._id}`,
 });
 
@@ -158,7 +158,7 @@ const formatCreditNoteResult = (cn) => ({
 exports.globalSearch = async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 60);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '30', 10), 1), 100);
     if (q.length < 2) {
       return res.json({ query: q, total: 0, suggestions: [], results: [] });
     }
@@ -166,6 +166,7 @@ exports.globalSearch = async (req, res, next) => {
     const candidateVisibility = await buildCandidateVisibilityQuery(req.user);
     const walkInVisibility = await buildWalkInVisibilityQuery(req.user);
     const taskVisibility = await buildTaskVisibilityQuery(req.user);
+    const candidateLimit = Math.max(20, Math.ceil(limit * 0.6));
     const perBucket = Math.max(4, Math.ceil(limit / 8));
 
     const qRegex = { $regex: escapeRegex(q), $options: 'i' };
@@ -176,6 +177,14 @@ exports.globalSearch = async (req, res, next) => {
         { email: qRegex },
         { skills: qRegex },
         { candidateId: qRegex },
+        { clientName: qRegex },
+        { companyName: qRegex },
+        { positionApplied: qRegex },
+        { jrNumber: qRegex },
+        { status: qRegex },
+        { currentStage: qRegex },
+        { assignedRecruiterName: qRegex },
+        { location: qRegex }
       ]
     };
     const walkInQuery = buildDynamicQuery(WalkIn, q);
@@ -192,8 +201,8 @@ exports.globalSearch = async (req, res, next) => {
       tasks.push(
         Candidate.find({ ...candidateVisibility, ...candidateQuery })
           .sort('-updatedAt')
-          .limit(perBucket)
-          .select('name email phone status assignedRecruiterName source updatedAt')
+          .limit(candidateLimit)
+          .select('name email phone status positionApplied clientName companyName assignedRecruiterName source updatedAt')
           .lean()
           .then(items => items.map(formatCandidateResult))
       );

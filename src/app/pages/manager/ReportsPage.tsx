@@ -10,8 +10,8 @@ export function ReportsPage() {
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   const todayStr = today.toISOString().split('T')[0];
 
-  const [dateFrom, setDateFrom] = useState(firstOfMonth);
-  const [dateTo, setDateTo] = useState(todayStr);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [sortField, setSortField] = useState<string>('revenue');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [performanceData, setPerformanceData] = useState<any[]>([]);
@@ -26,7 +26,34 @@ export function ReportsPage() {
   const [agingData, setAgingData] = useState<any>({ avgStageAging: {}, candidates: [] });
   const [conversionData, setConversionData] = useState<any[]>([]);
 
+<<<<<<< HEAD
   const fmt = (n: number) => n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${(n / 1000).toFixed(0)}K`;
+=======
+  // 4 New Specific Reports Datasets
+  const [activeJRsData, setActiveJRsData] = useState<any[]>([]);
+  const [activeProfilesData, setActiveProfilesData] = useState<any[]>([]);
+  const [expectedRevenueData, setExpectedRevenueData] = useState<{
+    customerRevenue: any[];
+    divisionRevenue: any[];
+    totalExpectedRevenue: number;
+  }>({ customerRevenue: [], divisionRevenue: [], totalExpectedRevenue: 0 });
+  const [leadPerformanceData, setLeadPerformanceData] = useState<any[]>([]);
+  const [teamWiseData, setTeamWiseData] = useState<{ teams: any[]; unassignedMembers: any[] }>({ teams: [], unassignedMembers: [] });
+  const [leadPerfMode, setLeadPerfMode] = useState<'team-wise' | 'flat'>('team-wise');
+
+  // Sub-filters for views
+  const [activeJRSearch, setActiveJRSearch] = useState('');
+  const [activeProfileFilter, setActiveProfileFilter] = useState<string>('All');
+  const [revenueSubView, setRevenueSubView] = useState<'joined-candidates' | 'customer' | 'division'>('joined-candidates');
+  const [expandedJR, setExpandedJR] = useState<string | null>(null);
+
+  const fmt = (n: number) => {
+    if (!n) return '₹0';
+    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
+    if (n >= 100000) return `₹${(n / 100000).toFixed(1)} L`;
+    return `₹${(n / 1000).toFixed(0)} K`;
+  };
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 
   const loadReports = async (from: string, to: string) => {
     try {
@@ -51,6 +78,16 @@ export function ReportsPage() {
       setAgingData(advData.aging || { avgStageAging: {}, candidates: [] });
       setConversionData(advData.conversionReport || []);
 
+<<<<<<< HEAD
+=======
+      // New 4 Reports
+      setActiveJRsData(advData.activeJRsReport || []);
+      setActiveProfilesData(advData.activeProfilesReport || []);
+      setExpectedRevenueData(advData.expectedRevenueReport || { customerRevenue: [], divisionRevenue: [], totalExpectedRevenue: 0 });
+      setLeadPerformanceData(advData.leadRecruiterPerformanceReport || []);
+      setTeamWiseData(advData.teamWisePerformanceReport || { teams: [], unassignedMembers: [] });
+
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
       // Fetch additional dashboard data for department distribution
       const dashData = await api.getManagerDashboard();
       setDepartmentData(dashData.departmentDistribution || []);
@@ -88,6 +125,83 @@ export function ReportsPage() {
     return sortDir === 'asc' ? <ChevronUp className="w-3 h-3 text-green-500" /> : <ChevronDown className="w-3 h-3 text-green-500" />;
   };
 
+<<<<<<< HEAD
+=======
+  // Filtered Active Profiles
+  const filteredActiveProfiles = activeProfilesData.filter(c => {
+    if (activeProfileFilter === 'All') return true;
+    if (activeProfileFilter === 'Documentation') return ['Documentation', 'Document Pending', 'Documents Pending'].includes(c.status);
+    if (activeProfileFilter === 'Pending Customer') return ['HR Shortlist', 'SPOC Shortlisted', 'Selected for Call', 'Operations Round', 'Interview Scheduled', 'Written Test'].includes(c.status);
+    if (activeProfileFilter === 'Yet To Join') return ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'].includes(c.status);
+    if (activeProfileFilter === 'Screening') return ['Screening', 'Contacted', 'Interested', 'Selected for Call', 'Eligible Candidates', 'Call Back'].includes(c.status);
+    return true;
+  });
+
+  // Filtered Active JRs
+  const filteredActiveJRs = activeJRsData.filter(j =>
+    !activeJRSearch.trim() ||
+    j.jrNumber.toLowerCase().includes(activeJRSearch.toLowerCase()) ||
+    j.customerName.toLowerCase().includes(activeJRSearch.toLowerCase()) ||
+    j.jobTitle.toLowerCase().includes(activeJRSearch.toLowerCase()) ||
+    j.skills.toLowerCase().includes(activeJRSearch.toLowerCase())
+  );
+
+  // Generic CSV exporter for current view
+  const exportCurrentViewCSV = () => {
+    let filename = `report_${activeView}_${dateFrom}_${dateTo}.csv`;
+    let csv = '';
+
+    if (activeView === 'active-jr') {
+      filename = `active_jr_report_${dateFrom}_${dateTo}.csv`;
+      csv = 'JR Number,Customer Name,Job Title,Skills,Open Positions,Active Pipeline,Screening,Interview,Offered,Yet To Join,Joined,Creator / Owner,Status\n' +
+        filteredActiveJRs.map(j => `"${j.jrNumber}","${j.customerName}","${j.jobTitle}","${j.skills.replace(/"/g, '""')}",${j.positions},${j.activeProfilesCount},${j.screeningCount || 0},${j.interviewCount || 0},${j.offeredCount || 0},${j.yetToJoinCount || 0},${j.joinedCount || 0},"${j.createdBy}","${j.status}"`).join('\n');
+    } else if (activeView === 'active-profiles') {
+      filename = `active_profiles_report_${dateFrom}_${dateTo}.csv`;
+      csv = 'Candidate Name,Phone,Email,Position Applied,Customer Name,Active Status,JR Number,Recruiter,Days Pending,Last Updated\n' +
+        filteredActiveProfiles.map(c => `"${c.name}","${c.phone}","${c.email}","${c.positionApplied}","${c.clientName}","${c.status}","${c.jrNumber}","${c.recruiter}",${c.daysPending},"${c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : ''}"`).join('\n');
+    } else if (activeView === 'expected-revenue') {
+      filename = `joined_candidates_revenue_report_${dateFrom}_${dateTo}.csv`;
+      if (revenueSubView === 'joined-candidates') {
+        csv = 'Candidate Name,Customer Name,Position / Division,Offered CTC,Date of Joining,Placement Revenue,Recruiter\n' +
+          ((expectedRevenueData as any).joinedCandidates || []).map((c: any) => `"${c.name}","${c.customerName}","${c.positionApplied} / ${c.division}",${c.ctc},"${c.doj}",${c.revenue},"${c.recruiter}"`).join('\n');
+      } else if (revenueSubView === 'customer') {
+        csv = 'Customer Name,Joined Count,Actual Joined Revenue\n' +
+          expectedRevenueData.customerRevenue.map(c => `"${c.customerName}",${c.joinedCount},${c.actualJoinedRevenue}`).join('\n');
+      } else {
+        csv = 'Division,Joined Count,Actual Joined Revenue\n' +
+          expectedRevenueData.divisionRevenue.map(d => `"${d.division}",${d.joinedCount},${d.actualJoinedRevenue}`).join('\n');
+      }
+    } else if (activeView === 'lead-performance') {
+      filename = `lead_recruiter_performance_${dateFrom}_${dateTo}.csv`;
+      let rows: string[] = [];
+      rows.push('Team Lead / Recruiter,Employee ID,Role,Profiles Submitted,Selects,Joinees,Joinees vs Submitted %,Joinees vs Selects %');
+      
+      (teamWiseData.teams || []).forEach(team => {
+        const tl = team.teamLeader;
+        rows.push(`"TEAM LEAD: ${tl.name}","${tl.employeeId}","Team Lead",${tl.totalSubmitted},${tl.totalSelects},${tl.totalJoinees},"${tl.totalJoineesVsSubmittedRatio}","${tl.totalJoineesVsSelectsRatio}"`);
+        (team.members || []).forEach((m: any) => {
+          rows.push(`"  └─ ${m.name}","${m.employeeId}","Recruiter",${m.submitted},${m.selects},${m.joinees},"${m.joineesVsSubmittedRatio}","${m.joineesVsSelectsRatio}"`);
+        });
+      });
+
+      if ((teamWiseData.unassignedMembers || []).length > 0) {
+        rows.push('"--- DIRECT / UNASSIGNED RECRUITERS ---",,,,,,,');
+        (teamWiseData.unassignedMembers || []).forEach((m: any) => {
+          rows.push(`"${m.name}","${m.employeeId}","Recruiter",${m.submitted},${m.selects},${m.joinees},"${m.joineesVsSubmittedRatio}","${m.joineesVsSelectsRatio}"`);
+        });
+      }
+
+      csv = rows.join('\n');
+    } else {
+      csv = 'Recruiter,Calls,Interviews,Placed,Conv Rate,Revenue\n' +
+        performanceData.map((r: any) => `"${r.recruiter}",${r.calls},${r.interviews},${r.placed},"${r.convRate}",${r.revenue}`).join('\n');
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  };
+
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -201,6 +315,7 @@ export function ReportsPage() {
         )}
       </div>
 
+<<<<<<< HEAD
       {/* Report View Switcher */}
       <div className="flex flex-wrap gap-1.5 bg-slate-100 p-1.5 rounded-xl w-fit">
         {[
@@ -223,6 +338,556 @@ export function ReportsPage() {
       </div>
 
       {/* ─── VIEW: RECRUITER WISE ─── */}
+=======
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 font-semibold">JR Number</th>
+                    <th className="px-4 py-3 font-semibold">Customer / Client</th>
+                    <th className="px-4 py-3 font-semibold">Job Title</th>
+                    <th className="px-4 py-3 font-semibold">Required Skills</th>
+                    <th className="px-4 py-3 font-semibold text-center">Open Positions</th>
+                    <th className="px-4 py-3 font-semibold text-center">Pipeline Breakdown (Screening / Int / Offer / YTJ / Joined)</th>
+                    <th className="px-4 py-3 font-semibold">Raised By / Owner</th>
+                    <th className="px-4 py-3 font-semibold text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {filteredActiveJRs.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-12 text-slate-400">No active job requisitions found matching your search.</td>
+                    </tr>
+                  ) : (
+                    filteredActiveJRs.map(j => (
+                      <Fragment key={j._id}>
+                        <tr className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3.5 font-mono font-bold text-blue-600">{j.jrNumber}</td>
+                          <td className="px-4 py-3.5 font-semibold text-slate-900">{j.customerName}</td>
+                          <td className="px-4 py-3.5 font-medium">{j.jobTitle}</td>
+                          <td className="px-4 py-3.5 max-w-xs truncate text-slate-600" title={j.skills}>{j.skills}</td>
+                          <td className="px-4 py-3.5 text-center font-semibold text-slate-800">{j.positions}</td>
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1 flex-wrap">
+                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100" title="Screening">
+                                Scr: {j.screeningCount || 0}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-100" title="Interview">
+                                Int: {j.interviewCount || 0}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100" title="Offered">
+                                Off: {j.offeredCount || 0}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-100" title="Yet To Join">
+                                YTJ: {j.yetToJoinCount || 0}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100" title="Joined">
+                                Jnd: {j.joinedCount || 0}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 font-medium text-slate-700">{j.createdBy}</td>
+                          <td className="px-4 py-3.5 text-center">
+                            <button
+                              onClick={() => setExpandedJR(expandedJR === j._id ? null : j._id)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              {expandedJR === j._id ? 'Hide Candidates' : `View (${j.activeProfilesCount})`}
+                            </button>
+                          </td>
+                        </tr>
+                        {/* Expanded Candidate Pipeline */}
+                        {expandedJR === j._id && (
+                          <tr className="bg-slate-50/80">
+                            <td colSpan={8} className="p-4">
+                              <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
+                                <h4 className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 text-blue-600" />
+                                  Active Pipeline Candidates for {j.jrNumber} – {j.jobTitle} ({j.activeCandidates.length})
+                                </h4>
+                                {j.activeCandidates.length === 0 ? (
+                                  <p className="text-slate-400 text-xs italic">No active candidates linked to this JR currently in progress.</p>
+                                ) : (
+                                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                    {j.activeCandidates.map((c: any) => (
+                                      <div key={c._id} className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-xs">
+                                        <div className="font-bold text-slate-800">{c.name}</div>
+                                        <div className="text-slate-500">{c.phone} · {c.email || 'No email'}</div>
+                                        <div className="mt-1 flex items-center justify-between text-[11px]">
+                                          <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">{c.status}</span>
+                                          <span className="text-slate-400">{c.recruiter}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 2. ACTIVE STATUS PROFILES REPORT VIEW */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {activeView === 'active-profiles' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-slate-800 font-bold text-sm">Active Pipeline Profiles Report</h3>
+              <p className="text-slate-500 text-xs mt-0.5">Filter active candidates across Documentation, Pending with Customer, Yet to Join & Screening</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['All', 'Documentation', 'Pending Customer', 'Yet To Join', 'Screening'].map(flt => (
+                <button
+                  key={flt}
+                  onClick={() => setActiveProfileFilter(flt)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeProfileFilter === flt
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {flt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 font-semibold">Candidate Name</th>
+                    <th className="px-4 py-3 font-semibold">Contact Info</th>
+                    <th className="px-4 py-3 font-semibold">Position Applied</th>
+                    <th className="px-4 py-3 font-semibold">Customer / Client</th>
+                    <th className="px-4 py-3 font-semibold">Active Status</th>
+                    <th className="px-4 py-3 font-semibold">JR Number</th>
+                    <th className="px-4 py-3 font-semibold">Recruiter</th>
+                    <th className="px-4 py-3 font-semibold text-center">Days Pending</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-slate-700">
+                  {filteredActiveProfiles.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-12 text-slate-400">No active profiles matching the selected status filter.</td>
+                    </tr>
+                  ) : (
+                    filteredActiveProfiles.map((c, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3.5 font-bold text-slate-900">{c.name}</td>
+                        <td className="px-4 py-3.5 text-slate-500">{c.phone} {c.email ? `· ${c.email}` : ''}</td>
+                        <td className="px-4 py-3.5 font-medium">{c.positionApplied}</td>
+                        <td className="px-4 py-3.5 font-semibold text-blue-600">{c.clientName}</td>
+                        <td className="px-4 py-3.5">
+                          <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold">
+                            {c.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 font-mono text-slate-600">{c.jrNumber}</td>
+                        <td className="px-4 py-3.5 text-slate-600">{c.recruiter}</td>
+                        <td className="px-4 py-3.5 text-center">
+                          <span className={`px-2 py-0.5 rounded font-semibold ${
+                            c.daysPending > 14 ? 'bg-red-100 text-red-700' :
+                            c.daysPending > 7 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {c.daysPending} days
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 3. JOINED CANDIDATES REVENUE REPORT VIEW */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {activeView === 'expected-revenue' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-slate-800 font-bold text-sm">Joined Candidates Revenue Report</h3>
+              <p className="text-slate-500 text-xs mt-0.5">Comprehensive tracking of Joined candidates with offered CTC, Date of Joining (DOJ), and actual revenue</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setRevenueSubView('joined-candidates')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  revenueSubView === 'joined-candidates' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Joined Candidates List
+              </button>
+              <button
+                onClick={() => setRevenueSubView('customer')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  revenueSubView === 'customer' ? 'bg-violet-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Customer Breakdown
+              </button>
+              <button
+                onClick={() => setRevenueSubView('division')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  revenueSubView === 'division' ? 'bg-violet-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Division Breakdown
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <span className="text-slate-700 font-semibold text-xs">Total Joined Placements: <strong className="text-emerald-700 font-bold">{(expectedRevenueData as any).totalJoinedCount || 0}</strong></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-700 font-semibold text-xs">Total Revenue Generated:</span>
+                <span className="text-emerald-700 font-extrabold text-base">{fmt((expectedRevenueData as any).totalJoinedRevenue || (expectedRevenueData as any).totalExpectedRevenue)}</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {revenueSubView === 'joined-candidates' ? (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                      <th className="px-5 py-3 font-semibold">Candidate Name</th>
+                      <th className="px-5 py-3 font-semibold">Customer / Client Name</th>
+                      <th className="px-5 py-3 font-semibold">Position / Division</th>
+                      <th className="px-5 py-3 font-semibold text-right text-slate-700">Offered CTC</th>
+                      <th className="px-5 py-3 font-semibold text-center text-slate-700">Date of Joining (DOJ)</th>
+                      <th className="px-5 py-3 font-semibold text-right text-emerald-700">Placement Revenue</th>
+                      <th className="px-5 py-3 font-semibold">Recruiter</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-slate-700">
+                    {((expectedRevenueData as any).joinedCandidates || []).length === 0 ? (
+                      <tr><td colSpan={7} className="text-center py-10 text-slate-400">No joined candidates recorded in this date range.</td></tr>
+                    ) : (
+                      ((expectedRevenueData as any).joinedCandidates || []).map((c: any, i: number) => (
+                        <tr key={c._id || i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-5 py-3.5 font-bold text-slate-900">{c.name}</td>
+                          <td className="px-5 py-3.5 font-semibold text-blue-600">{c.customerName}</td>
+                          <td className="px-5 py-3.5 text-slate-600">{c.positionApplied} <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 font-bold">{c.division}</span></td>
+                          <td className="px-5 py-3.5 text-right font-semibold text-slate-800">{c.ctc ? fmt(c.ctc) : '—'}</td>
+                          <td className="px-5 py-3.5 text-center font-bold text-emerald-700 bg-emerald-50/30">{c.doj}</td>
+                          <td className="px-5 py-3.5 text-right font-extrabold text-emerald-700">{fmt(c.revenue)}</td>
+                          <td className="px-5 py-3.5 text-slate-600">{c.recruiter}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : revenueSubView === 'customer' ? (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                      <th className="px-5 py-3 font-semibold">Customer / Client Name</th>
+                      <th className="px-5 py-3 font-semibold text-center">Joined Candidates</th>
+                      <th className="px-5 py-3 font-semibold text-right text-emerald-700">Actual Revenue Generated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-slate-700">
+                    {expectedRevenueData.customerRevenue.length === 0 ? (
+                      <tr><td colSpan={3} className="text-center py-10 text-slate-400">No customer revenue data available.</td></tr>
+                    ) : (
+                      expectedRevenueData.customerRevenue.map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-5 py-3.5 font-bold text-slate-900">{r.customerName}</td>
+                          <td className="px-5 py-3.5 text-center font-semibold text-emerald-600">{r.joinedCount}</td>
+                          <td className="px-5 py-3.5 text-right font-bold text-emerald-700">{fmt(r.actualJoinedRevenue)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                      <th className="px-5 py-3 font-semibold">Division</th>
+                      <th className="px-5 py-3 font-semibold text-center">Joined Candidates</th>
+                      <th className="px-5 py-3 font-semibold text-right text-emerald-700">Actual Revenue Generated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-slate-700">
+                    {expectedRevenueData.divisionRevenue.length === 0 ? (
+                      <tr><td colSpan={3} className="text-center py-10 text-slate-400">No division revenue data available.</td></tr>
+                    ) : (
+                      expectedRevenueData.divisionRevenue.map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-5 py-3.5 font-bold text-slate-900">{r.division} Division</td>
+                          <td className="px-5 py-3.5 text-center font-semibold text-emerald-600">{r.joinedCount}</td>
+                          <td className="px-5 py-3.5 text-right font-bold text-emerald-700">{fmt(r.actualJoinedRevenue)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 4. LEAD & RECRUITER PERFORMANCE REPORT VIEW (TEAM-WISE HIERARCHY) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {activeView === 'lead-performance' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-slate-800 font-bold text-sm">Team Lead & Recruiter Performance Ratios</h3>
+              <p className="text-slate-500 text-xs mt-0.5">Hierarchical breakdown by Team Lead, displaying team totals and individual recruiter ratios</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setLeadPerfMode('team-wise')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  leadPerfMode === 'team-wise' ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Team-Wise Hierarchy View
+              </button>
+              <button
+                onClick={() => setLeadPerfMode('flat')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  leadPerfMode === 'flat' ? 'bg-slate-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All Members (Flat List)
+              </button>
+            </div>
+          </div>
+
+          {leadPerfMode === 'team-wise' ? (
+            <div className="space-y-6">
+              {(teamWiseData.teams || []).length === 0 && (teamWiseData.unassignedMembers || []).length === 0 ? (
+                <div className="bg-white rounded-xl border border-slate-100 p-12 text-center text-slate-400">
+                  No team performance data available for this selection.
+                </div>
+              ) : (
+                <>
+                  {(teamWiseData.teams || []).map((team: any, index: number) => {
+                    const tl = team.teamLeader;
+                    return (
+                      <div key={tl.userId || index} className="bg-white rounded-xl border border-amber-200/70 shadow-sm overflow-hidden">
+                        {/* Team Lead Header Banner */}
+                        <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-white p-4 border-b border-amber-200/70 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-600 text-white font-bold flex items-center justify-center text-sm shadow-sm">
+                              TL
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-slate-900 text-sm">{tl.name}</h4>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  TEAM LEAD
+                                </span>
+                                <span className="text-slate-400 text-xs font-mono">({tl.employeeId})</span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Team Members: <strong className="text-slate-700 font-semibold">{team.members.length} Recruiters</strong>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Team Summary Ratios */}
+                          <div className="flex items-center gap-4 flex-wrap bg-white/80 backdrop-blur px-4 py-2 rounded-lg border border-amber-100 text-xs">
+                            <div className="text-center">
+                              <div className="text-slate-400 text-[10px] font-medium uppercase">Team Submitted</div>
+                              <div className="font-bold text-slate-800 text-sm">{tl.totalSubmitted}</div>
+                            </div>
+                            <div className="w-px h-6 bg-slate-200" />
+                            <div className="text-center">
+                              <div className="text-slate-400 text-[10px] font-medium uppercase">Team Selects</div>
+                              <div className="font-bold text-blue-600 text-sm">{tl.totalSelects}</div>
+                            </div>
+                            <div className="w-px h-6 bg-slate-200" />
+                            <div className="text-center">
+                              <div className="text-slate-400 text-[10px] font-medium uppercase">Team Joinees</div>
+                              <div className="font-extrabold text-emerald-600 text-sm">{tl.totalJoinees}</div>
+                            </div>
+                            <div className="w-px h-6 bg-slate-200" />
+                            <div className="text-center">
+                              <div className="text-blue-600 text-[10px] font-bold uppercase">Joinees / Submitted</div>
+                              <div className="font-extrabold text-blue-700 text-xs bg-blue-50 px-2 py-0.5 rounded mt-0.5">{tl.totalJoineesVsSubmittedRatio}</div>
+                            </div>
+                            <div className="w-px h-6 bg-slate-200" />
+                            <div className="text-center">
+                              <div className="text-emerald-600 text-[10px] font-bold uppercase">Joinees / Selects</div>
+                              <div className="font-extrabold text-emerald-700 text-xs bg-emerald-50 px-2 py-0.5 rounded mt-0.5">{tl.totalJoineesVsSelectsRatio}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Team Recruiters Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                                <th className="px-5 py-3 font-semibold">Recruiter Name</th>
+                                <th className="px-5 py-3 font-semibold">Employee ID</th>
+                                <th className="px-5 py-3 font-semibold text-center">Profiles Submitted</th>
+                                <th className="px-5 py-3 font-semibold text-center">Selects</th>
+                                <th className="px-5 py-3 font-semibold text-center">Joinees</th>
+                                <th className="px-5 py-3 font-semibold text-center text-blue-700 bg-blue-50/50">Joinees Vs Submitted</th>
+                                <th className="px-5 py-3 font-semibold text-center text-emerald-700 bg-emerald-50/50">Joinees Vs Selects</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {team.members.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="text-center py-6 text-slate-400 italic">No recruiters currently assigned under this Team Lead.</td>
+                                </tr>
+                              ) : (
+                                team.members.map((m: any) => (
+                                  <tr key={m.userId} className="hover:bg-slate-50/70 transition-colors">
+                                    <td className="px-5 py-3.5 font-bold text-slate-900 flex items-center gap-2">
+                                      <span className="text-slate-400 font-mono text-[10px]">└─</span> {m.name}
+                                    </td>
+                                    <td className="px-5 py-3.5 font-mono text-slate-500">{m.employeeId}</td>
+                                    <td className="px-5 py-3.5 text-center font-medium text-slate-800">{m.submitted}</td>
+                                    <td className="px-5 py-3.5 text-center font-semibold text-blue-600">{m.selects}</td>
+                                    <td className="px-5 py-3.5 text-center font-bold text-emerald-600">{m.joinees}</td>
+                                    <td className="px-5 py-3.5 text-center font-extrabold text-blue-700 bg-blue-50/30">
+                                      {m.joineesVsSubmittedRatio} ({m.joinees}/{m.submitted})
+                                    </td>
+                                    <td className="px-5 py-3.5 text-center font-extrabold text-emerald-700 bg-emerald-50/30">
+                                      {m.joineesVsSelectsRatio} ({m.joinees}/{m.selects})
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Direct / Unassigned Recruiters Section */}
+                  {(teamWiseData.unassignedMembers || []).length > 0 && (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="bg-slate-100 p-4 border-b border-slate-200 flex items-center justify-between">
+                        <div>
+                          <h4 className="font-bold text-slate-800 text-sm">Direct / Unassigned Recruiters</h4>
+                          <p className="text-xs text-slate-500">Recruiters not assigned to a specific Team Lead</p>
+                        </div>
+                        <span className="px-2.5 py-1 rounded bg-slate-200 text-slate-700 font-bold text-xs">
+                          {teamWiseData.unassignedMembers.length} Members
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                              <th className="px-5 py-3 font-semibold">Recruiter Name</th>
+                              <th className="px-5 py-3 font-semibold">Employee ID</th>
+                              <th className="px-5 py-3 font-semibold text-center">Profiles Submitted</th>
+                              <th className="px-5 py-3 font-semibold text-center">Selects</th>
+                              <th className="px-5 py-3 font-semibold text-center">Joinees</th>
+                              <th className="px-5 py-3 font-semibold text-center text-blue-700 bg-blue-50/50">Joinees Vs Submitted</th>
+                              <th className="px-5 py-3 font-semibold text-center text-emerald-700 bg-emerald-50/50">Joinees Vs Selects</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-slate-700">
+                            {teamWiseData.unassignedMembers.map((m: any) => (
+                              <tr key={m.userId} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="px-5 py-3.5 font-bold text-slate-900">{m.name}</td>
+                                <td className="px-5 py-3.5 font-mono text-slate-500">{m.employeeId}</td>
+                                <td className="px-5 py-3.5 text-center font-medium text-slate-800">{m.submitted}</td>
+                                <td className="px-5 py-3.5 text-center font-semibold text-blue-600">{m.selects}</td>
+                                <td className="px-5 py-3.5 text-center font-bold text-emerald-600">{m.joinees}</td>
+                                <td className="px-5 py-3.5 text-center font-extrabold text-blue-700 bg-blue-50/30">
+                                  {m.joineesVsSubmittedRatio} ({m.joinees}/{m.submitted})
+                                </td>
+                                <td className="px-5 py-3.5 text-center font-extrabold text-emerald-700 bg-emerald-50/30">
+                                  {m.joineesVsSelectsRatio} ({m.joinees}/{m.selects})
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-left text-slate-500 uppercase tracking-wide">
+                      <th className="px-4 py-3 font-semibold">Name</th>
+                      <th className="px-4 py-3 font-semibold">Employee ID</th>
+                      <th className="px-4 py-3 font-semibold">Role</th>
+                      <th className="px-4 py-3 font-semibold text-center">Profiles Submitted</th>
+                      <th className="px-4 py-3 font-semibold text-center">Selects</th>
+                      <th className="px-4 py-3 font-semibold text-center">Joinees</th>
+                      <th className="px-4 py-3 font-semibold text-center text-blue-700 bg-blue-50/50">Joinees Vs Submitted</th>
+                      <th className="px-4 py-3 font-semibold text-center text-emerald-700 bg-emerald-50/50">Joinees Vs Selects</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-slate-700">
+                    {leadPerformanceData.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-12 text-slate-400">No performance activity recorded for this period.</td>
+                      </tr>
+                    ) : (
+                      leadPerformanceData.map((l, i) => (
+                        <tr key={i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3.5 font-bold text-slate-900">{l.name}</td>
+                          <td className="px-4 py-3.5 font-mono text-slate-500">{l.employeeId}</td>
+                          <td className="px-4 py-3.5">
+                            <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${l.role.includes('Lead') ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                              {l.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center font-medium">{l.submitted}</td>
+                          <td className="px-4 py-3.5 text-center font-semibold text-blue-600">{l.selects}</td>
+                          <td className="px-4 py-3.5 text-center font-bold text-emerald-600">{l.joinees}</td>
+                          <td className="px-4 py-3.5 text-center font-extrabold text-blue-700 bg-blue-50/30">
+                            {l.joineesVsSubmittedRatio} ({l.joinees}/{l.submitted})
+                          </td>
+                          <td className="px-4 py-3.5 text-center font-extrabold text-emerald-700 bg-emerald-50/30">
+                            {l.joineesVsSelectsRatio} ({l.joinees}/{l.selects})
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 5. EXISTING VIEWS: RECRUITER, CUSTOMER, DIVISION, AGING, CONVERSION */}
+      {/* ────────────────────────────────────────────────────────── */}
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
       {activeView === 'recruiter' && (
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">

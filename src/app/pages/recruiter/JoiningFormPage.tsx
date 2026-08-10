@@ -499,40 +499,26 @@ export function JoiningFormPage() {
     // Required fields
     if (!form.fullName) newErrors.fullName = 'Name required';
     if (!form.dateOfBirth) newErrors.dateOfBirth = 'DOB required';
-    if (!form.photo && !form.photoPath) newErrors.photo = 'Photo is mandatory';
-    if (!form.phone || form.phone.length !== 10) newErrors.phone = 'Valid 10-digit phone required';
+    if (!form.phone || form.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Valid 10-digit phone required';
     if (!form.permanentAddress) newErrors.permanentAddress = 'Permanent address required';
-    if (!form.positionApplied) newErrors.positionApplied = 'Position required';
-    if (!form.joiningDate) newErrors.joiningDate = 'Joining date required';
-
-    // Education documents
-    if (!form.highestQualification.marksheetFile && !form.highestQualification.marksheetPath) newErrors.marksheet = 'Marksheet required';
-    if (!form.highestQualification.degreeCertificateFile && !form.highestQualification.degreeCertificatePath) newErrors.degreeCertificate = 'Degree certificate required';
 
     // Employment history (only required for non-freshers)
     if (!form.isFresher) {
-      if (form.employmentHistory.length === 0) {
-        newErrors.employment = 'At least 1 employment entry required';
-      } else {
+      if (form.employmentHistory.length > 0) {
         form.employmentHistory.forEach((emp, idx) => {
           if (!emp.companyName) newErrors[`emp${idx}Company`] = 'Company name required';
-          if (!emp.fromDate) newErrors[`emp${idx}FromDate`] = 'From date required';
-          if (!emp.relievingLetterFile && !emp.relievingLetterPath) newErrors[`emp${idx}Relieving`] = 'Relieving letter required';
         });
       }
     }
 
     // References
     if (form.references.length < 2) {
-      newErrors.references = 'Exactly 2 references required';
+      newErrors.references = 'At least 2 references required';
     } else {
       form.references.forEach((ref, idx) => {
         if (!ref.name) newErrors[`ref${idx}Name`] = 'Name required';
         if (!ref.relationship) newErrors[`ref${idx}Rel`] = 'Relationship required';
-        if (ref.relationship === 'Mother' || ref.relationship === 'Father' || ref.relationship === 'Guardian') {
-          newErrors[`ref${idx}Rel`] = 'Cannot be parent or guardian';
-        }
-        if (!ref.contactNumber || ref.contactNumber.length !== 10) newErrors[`ref${idx}Phone`] = 'Valid 10-digit phone required';
+        if (!ref.contactNumber || ref.contactNumber.replace(/\D/g, '').length < 10) newErrors[`ref${idx}Phone`] = 'Valid 10-digit phone required';
       });
     }
 
@@ -546,7 +532,7 @@ export function JoiningFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
-      alert('Please fix validation errors');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 

@@ -145,7 +145,7 @@ export function TLDashboard() {
         if (recruiter) params.recruiter = recruiter;
 
         const [tlData, rDashData, tasksData] = await Promise.all([
-          api.getTLDashboard({ range: dateRange.toLowerCase() }),
+          api.getTLDashboard(params),
           api.getRecruiterDashboard(params).catch(() => null),
           api.getTasks({ status: 'Pending,In Progress' }).catch(() => ({ tasks: [] })),
         ]);

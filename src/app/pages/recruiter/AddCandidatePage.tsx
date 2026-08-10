@@ -279,8 +279,8 @@ export function AddCandidatePage() {
   const canEditInterviewStatus = ['admin', 'tl', 'manager'].includes(user?.role ?? '');
   // TL and Manager have full edit permissions now
   const isTLReadOnly = false;
-  // Recruiter viewing an existing candidate → core fields are locked/disabled
-  const isLockedCoreFields = isRecruiter && !!candidateId;
+  // Recruiter viewing an existing candidate → allow editing candidate profile
+  const isLockedCoreFields = false;
 
   const [form, setForm] = useState({ ...EMPTY_FORM, recruiterName: user?.name || '', recruiterEmail: user?.email || '', recruiterApplyEmail: user?.email || '', sourcedBy: user?.name || '' });
   const isLockedByFinalInterview = form.finalInterviewLocked && !isAdmin && user?.role !== 'tl' && user?.role !== 'manager';

@@ -12,7 +12,7 @@ const { getDateRange } = require('../utils/helpers');
 // GET /api/dashboard/recruiter
 exports.recruiterDashboard = async (req, res, next) => {
   try {
-    const { dateRange = 'month', startDate, endDate, division, company, customer, recruiter } = req.query;
+    const { dateRange = 'month', startDate, endDate, division, company, customer, recruiter, tlId } = req.query;
     const { start, end } = getDateRange(dateRange, startDate, endDate);
     const userId = req.user._id;
     const isAdmin = ['admin', 'manager', 'tl'].includes(req.user.role);
@@ -20,21 +20,47 @@ exports.recruiterDashboard = async (req, res, next) => {
     const dateFilter = { $gte: start, $lt: end };
     
     let filterRecruiter = userId;
+    let recruiterIdsFilter = null;
+
     if (isAdmin) {
+<<<<<<< HEAD
       if (recruiter) {
         // If admin/manager/tl wants a specific recruiter
         filterRecruiter = new mongoose.Types.ObjectId(recruiter);
+=======
+      if (recruiter && recruiter !== 'All Recruiters' && recruiter !== 'All') {
+        filterRecruiter = mongoose.Types.ObjectId.isValid(recruiter) ? new mongoose.Types.ObjectId(recruiter) : recruiter;
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
       } else {
         filterRecruiter = null; // Admin viewing all
       }
+
+      if (!filterRecruiter && (tlId || req.user.role === 'tl')) {
+        const targetTlId = tlId && mongoose.Types.ObjectId.isValid(tlId) ? tlId : req.user._id;
+        const teamAssignments = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null }).lean();
+        const memberIds = teamAssignments.map(ta => ta.memberId).filter(Boolean);
+        const userIds = [targetTlId, ...memberIds];
+        recruiterIdsFilter = userIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
+      }
     }
 
-    const baseMatch = { createdAt: dateFilter };
-    if (filterRecruiter) baseMatch.assignedRecruiter = filterRecruiter;
-    if (division) baseMatch.division = division;
+    const baseMatch = (dateRange || 'month').toLowerCase() !== 'all' ? { createdAt: dateFilter } : {};
+    if (filterRecruiter) {
+      baseMatch.assignedRecruiter = filterRecruiter;
+    } else if (recruiterIdsFilter) {
+      baseMatch.assignedRecruiter = { $in: recruiterIdsFilter };
+    }
+    if (division && division !== 'All') baseMatch.division = division;
     
     const clientFilter = customer || company;
-    if (clientFilter) baseMatch.clientName = clientFilter;
+    if (clientFilter && clientFilter !== 'All Companies') {
+      const companyRegex = new RegExp(`^${clientFilter.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      baseMatch.$or = [
+        { clientName: companyRegex },
+        { company: companyRegex },
+        { client: companyRegex },
+      ];
+    }
 
     // Pipeline counts
     const statusCounts = await Candidate.aggregate([
@@ -44,7 +70,61 @@ exports.recruiterDashboard = async (req, res, next) => {
 
     const pipeline = {};
     Candidate.STATUSES.forEach(s => { pipeline[s] = 0; });
+<<<<<<< HEAD
     statusCounts.forEach(s => { pipeline[s._id] = s.count; });
+=======
+    statusCounts.forEach(s => { if (s._id) pipeline[s._id] = s.count; });
+    pipeline['Eligible'] = (pipeline['Eligible'] || 0) + (pipeline['Eligible Candidates'] || 0);
+
+    // Candidate & Job metrics for Requirements 16 & 20
+    const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));
+    const endOfToday = new Date(new Date().setHours(23, 59, 59, 999));
+
+    const profilesUploadedTodayMatch = {
+      createdAt: { $gte: startOfToday, $lt: endOfToday }
+    };
+    if (filterRecruiter) profilesUploadedTodayMatch.assignedRecruiter = filterRecruiter;
+
+    const profilesUploadedToday = await Candidate.countDocuments(profilesUploadedTodayMatch);
+    const openRequirements = await Job.countDocuments({ status: { $regex: /^open$/i } });
+
+    const candDateFilter = (dateRange || 'month').toLowerCase() !== 'all' ? { createdAt: dateFilter } : {};
+
+    const recruiterCandidateFilter = filterRecruiter ? { assignedRecruiter: filterRecruiter } : {};
+    if (division && division !== 'All') recruiterCandidateFilter.division = division;
+    if (clientFilter && clientFilter !== 'All Companies') {
+      const companyRegex = new RegExp(`^${clientFilter.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      recruiterCandidateFilter.$or = [
+        { clientName: companyRegex },
+        { company: companyRegex },
+        { client: companyRegex },
+      ];
+    }
+
+    const eligibleCount = await Candidate.countDocuments({
+      ...recruiterCandidateFilter,
+      ...candDateFilter,
+      status: { $in: ['Eligible', 'Eligible Candidates'] }
+    });
+
+    const finalSelectCount = await Candidate.countDocuments({
+      ...recruiterCandidateFilter,
+      ...candDateFilter,
+      status: { $in: ['L1 Select', 'Client Select', 'Final Select', 'Selected'] }
+    });
+
+    const waitingForOfferCount = await Candidate.countDocuments({
+      ...recruiterCandidateFilter,
+      ...candDateFilter,
+      status: { $in: ['Offer Released', 'Yet To Join', 'Documentation in Progress', 'Documentation'] }
+    });
+
+    const joinedCount = await Candidate.countDocuments({
+      ...recruiterCandidateFilter,
+      ...candDateFilter,
+      status: 'Joined'
+    });
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 
     // Call stats
     const callMatch = { createdAt: dateFilter };
@@ -110,7 +190,11 @@ exports.recruiterDashboard = async (req, res, next) => {
 // GET /api/dashboard/tl
 exports.tlDashboard = async (req, res, next) => {
   try {
+<<<<<<< HEAD
     const { tlId } = req.query;
+=======
+    const { range = 'month', startDate, endDate, tlId, division, company, customer, recruiter } = req.query;
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     const currentUser = req.user;
 
     // Determine target TL ID: Admins can specify, TLs get their own
@@ -125,6 +209,22 @@ exports.tlDashboard = async (req, res, next) => {
       .map(ta => ta.memberId)
       .filter(u => u && u.status === 'Active');
 
+<<<<<<< HEAD
+=======
+    if (recruiters.length === 0 && (currentUser.role === 'admin' || currentUser.role === 'manager') && !tlId) {
+      recruiters = await User.find({ role: { $in: ['recruiter', 'tl'] }, status: { $ne: 'Suspended' } }).select('name email employeeId status').lean();
+    } else {
+      const targetTlUser = await User.findById(targetTlId).select('name email employeeId status').lean();
+      if (targetTlUser && !recruiters.some(r => String(r._id) === String(targetTlId))) {
+        recruiters.unshift(targetTlUser);
+      }
+    }
+
+    if (recruiter && recruiter !== 'All Recruiters' && recruiter !== 'All') {
+      recruiters = recruiters.filter(r => String(r._id) === String(recruiter) || r.name === recruiter);
+    }
+
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     const recruiterIds = recruiters.map(r => r._id);
 
     const today = new Date();
@@ -132,11 +232,52 @@ exports.tlDashboard = async (req, res, next) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    const clientFilter = customer || company;
+    const extraFilter = {};
+    if (division && division !== 'All') extraFilter.division = division;
+    if (clientFilter && clientFilter !== 'All Companies') {
+      const companyRegex = new RegExp(`^${clientFilter.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      extraFilter.$or = [
+        { clientName: companyRegex },
+        { company: companyRegex },
+        { client: companyRegex },
+      ];
+    }
+
     const teamStats = await Promise.all(recruiters.map(async (r) => {
+<<<<<<< HEAD
       // Count notes added today as "calls made" (each note = a recruiter interaction)
+=======
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
       const callsAgg = await Candidate.aggregate([
+        { $match: { assignedRecruiter: r._id, ...extraFilter } },
+        { $unwind: '$notes' },
+<<<<<<< HEAD
+=======
+        ...(selectedRange !== 'all' ? [{ $match: { 'notes.createdAt': dateFilter } }] : []),
+        { $count: 'count' },
+      ]);
+      const totalCalls = callsAgg[0]?.count || 0;
+
+      const candMatch = (extraStatus) => {
+        return {
+          assignedRecruiter: r._id,
+          ...extraFilter,
+          ...(selectedRange !== 'all' ? { createdAt: dateFilter } : {}),
+          ...extraStatus
+        };
+      };
+
+      const eligible = await Candidate.countDocuments(candMatch({ status: { $in: ['Eligible', 'Eligible Candidates'] } }));
+      const finalSelect = await Candidate.countDocuments(candMatch({ status: { $in: ['Final Select', 'Final Round Scheduled', 'Final Round Completed', 'L1 Select', 'Client Select', 'Selected'] } }));
+      const docCompleted = await Candidate.countDocuments(candMatch({ status: { $in: ['Documentation Completed', 'Documentation Incomplete', 'Document Initialized', 'Documennt Initialted', 'Documentation'] } }));
+      const offerAccept = await Candidate.countDocuments(candMatch({ status: { $in: ['Offer Accept', 'Offer Accepted', 'Offered', 'Offer Released'] } }));
+      const joined = await Candidate.countDocuments(candMatch({ status: 'Joined' }));
+
+      const todayCallsAgg = await Candidate.aggregate([
         { $match: { assignedRecruiter: r._id } },
         { $unwind: '$notes' },
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
         { $match: { 'notes.createdAt': { $gte: today, $lt: tomorrow } } },
         { $count: 'count' },
       ]);
@@ -145,6 +286,7 @@ exports.tlDashboard = async (req, res, next) => {
       // Count candidates with interview scheduled today
       const todayInterviews = await Candidate.countDocuments({
         assignedRecruiter: r._id,
+        ...extraFilter,
         $or: [
           { interviewScheduled: { $gte: today, $lt: tomorrow } },
           { interviewDate: { $gte: today, $lt: tomorrow } },
@@ -154,13 +296,15 @@ exports.tlDashboard = async (req, res, next) => {
       // Count candidates needing TL follow-up (Eligible, but no TL call submitted)
       const followUps = await Candidate.countDocuments({
         assignedRecruiter: r._id,
+        ...extraFilter,
         firstCallStatus: 'Eligible',
         tlCallSubmitted: false,
       });
 
-      const totalCandidates = await Candidate.countDocuments({ assignedRecruiter: r._id });
+      const totalCandidates = await Candidate.countDocuments({ assignedRecruiter: r._id, ...extraFilter });
       const activeCandidates = await Candidate.countDocuments({
         assignedRecruiter: r._id,
+        ...extraFilter,
         status: { $nin: ['Rejected', 'Joined'] },
       });
 
@@ -193,6 +337,31 @@ exports.tlDashboard = async (req, res, next) => {
       };
     }));
 
+<<<<<<< HEAD
+=======
+    // Team Summary Totals
+    const summary = {
+      totalCalls: teamStats.reduce((s, r) => s + r.totalCalls, 0),
+      eligible: teamStats.reduce((s, r) => s + r.eligible, 0),
+      finalSelect: teamStats.reduce((s, r) => s + r.finalSelect, 0),
+      docCompleted: teamStats.reduce((s, r) => s + r.docCompleted, 0),
+      offerAccept: teamStats.reduce((s, r) => s + r.offerAccept, 0),
+      joined: teamStats.reduce((s, r) => s + r.joined, 0),
+    };
+
+    if ((currentUser.role === 'admin' || currentUser.role === 'manager') && !tlId && (!recruiter || recruiter === 'All Recruiters' || recruiter === 'All')) {
+      const summaryMatch = {
+        ...extraFilter,
+        ...(selectedRange !== 'all' ? { createdAt: dateFilter } : {})
+      };
+      summary.eligible = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Eligible', 'Eligible Candidates'] } });
+      summary.finalSelect = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Final Select', 'Final Round Scheduled', 'Final Round Completed', 'L1 Select', 'Client Select', 'Selected'] } });
+      summary.docCompleted = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Documentation Completed', 'Documentation Incomplete', 'Document Initialized', 'Documennt Initialted', 'Documentation'] } });
+      summary.offerAccept = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Offer Accept', 'Offer Accepted', 'Offered', 'Offer Released'] } });
+      summary.joined = await Candidate.countDocuments({ ...summaryMatch, status: 'Joined' });
+    }
+
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     // Pending corrections (filtered by team members)
     const corrections = await Candidate.find({ 
       flagged: true,
@@ -413,6 +582,10 @@ exports.adminDashboard = async (req, res, next) => {
         hrRoundCount,
         followToJoinCount,
         joinedCount,
+<<<<<<< HEAD
+=======
+        joined: joinedCount,
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
         rejectedCount,
         openJobsCount,
         currentMonthRevenue,
@@ -435,8 +608,11 @@ exports.adminDashboard = async (req, res, next) => {
 // GET /api/dashboard/manager/reports
 exports.managerReports = async (req, res, next) => {
   try {
-    const { dateRange = 'month', startDate, endDate, sort = 'placements' } = req.query;
-    const { start, end } = getDateRange(dateRange, startDate, endDate);
+    const { dateRange, range, startDate, endDate, from, to, sort = 'placements' } = req.query;
+    const customStart = (startDate && String(startDate).trim()) || (from && String(from).trim()) || null;
+    const customEnd = (endDate && String(endDate).trim()) || (to && String(to).trim()) || null;
+    const selectedRange = (customStart || customEnd) ? 'custom' : (dateRange || range || 'all');
+    const { start, end } = getDateRange(selectedRange, customStart, customEnd);
     const dateFilter = { $gte: start, $lt: end };
 
     const recruiters = await User.find({ role: 'recruiter', status: 'Active' }).select('name employeeId');
@@ -591,10 +767,92 @@ exports.divisionDashboard = async (req, res, next) => {
     const joinedCount = await Candidate.countDocuments({ division, status: 'Joined' });
     const yetToJoinCount = await Candidate.countDocuments({ division, status: 'Yet To Join' });
 
+<<<<<<< HEAD
     // 3. Joined Candidates with Date of Joining
     const joinedCandidates = await Candidate.find({ division, status: 'Joined' })
       .select('name positionApplied clientName dateOfJoining assignedRecruiterName')
       .sort('-dateOfJoining');
+=======
+    const interviewStatuses = [
+      'Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Interview',
+      'Selected for Interview', 'Written Test', 'Operations Round', 'Interview Feedback Pending',
+      'Test Select', 'Test Reject'
+    ];
+
+    const offerStatuses = [
+      'Document Initialized', 'Documennt Initialted', 'Documentation Completed',
+      'Documentation Incomplete', 'Waiting for Offer', 'Offer Accept', 'Offered',
+      'Offer Released', 'Offer Accepted', 'Document Pending', 'Documentation',
+      'Selected', 'L1 Select', 'L2 Select', 'Final Select', 'VNA Select', 'Client Select'
+    ];
+
+    const baseYetToJoinOr = [
+      { status: { $in: ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'] } },
+      { candidateStatusPostOffer: 'Yet To Join' },
+      { currentStage: 'Joining', status: { $ne: 'Joined' } }
+    ];
+
+    function buildQueryWithOr(baseQuery, extraOrArray) {
+      if (baseQuery.$and) {
+        return {
+          ...baseQuery,
+          $and: [...baseQuery.$and, { $or: extraOrArray }]
+        };
+      }
+      if (baseQuery.$or) {
+        const { $or: existingOr, ...rest } = baseQuery;
+        return {
+          ...rest,
+          $and: [
+            { $or: existingOr },
+            { $or: extraOrArray }
+          ]
+        };
+      }
+      return {
+        ...baseQuery,
+        $or: extraOrArray
+      };
+    }
+
+    const screeningMatch = buildQueryWithOr(candQuery, [
+      { status: { $in: screeningStatuses } }
+    ]);
+
+    const interviewMatch = buildQueryWithOr(candQuery, [
+      { status: { $in: interviewStatuses } }
+    ]);
+
+    const offerMatch = buildQueryWithOr(candQuery, [
+      { status: { $in: offerStatuses } }
+    ]);
+
+    const yetToJoinMatch = buildQueryWithOr(candQuery, [
+      { status: { $in: ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'] } }
+    ]);
+
+    const [
+      screeningCount,
+      interviewCount,
+      offerCount,
+      yetToJoinCount,
+      joinedCount,
+      joinedCandidates,
+      yetToJoinCandidates
+    ] = await Promise.all([
+      Candidate.countDocuments(screeningMatch),
+      Candidate.countDocuments(interviewMatch),
+      Candidate.countDocuments(offerMatch),
+      Candidate.countDocuments(yetToJoinMatch),
+      Candidate.countDocuments({ ...candQuery, status: 'Joined' }),
+      Candidate.find({ ...candQuery, status: 'Joined' })
+        .select('name positionApplied clientName dateOfJoining assignedRecruiterName status')
+        .sort('-dateOfJoining'),
+      Candidate.find(yetToJoinMatch)
+        .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status candidateStatusPostOffer')
+        .sort('-createdAt')
+    ]);
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 
     res.json({
       division,
@@ -617,8 +875,11 @@ exports.divisionDashboard = async (req, res, next) => {
 // GET /api/dashboard/reports/advanced
 exports.advancedReports = async (req, res, next) => {
   try {
-    const { dateRange = 'month', startDate, endDate } = req.query;
-    const { start, end } = getDateRange(dateRange, startDate, endDate);
+    const { dateRange, range, startDate, endDate, from, to } = req.query;
+    const customStart = (startDate && String(startDate).trim()) || (from && String(from).trim()) || null;
+    const customEnd = (endDate && String(endDate).trim()) || (to && String(to).trim()) || null;
+    const selectedRange = (customStart || customEnd) ? 'custom' : (dateRange || range || 'all');
+    const { start, end } = getDateRange(selectedRange, customStart, customEnd);
     
     const Job = require('../models/Job');
     const Candidate = require('../models/Candidate');
@@ -766,6 +1027,249 @@ exports.advancedReports = async (req, res, next) => {
       };
     });
 
+<<<<<<< HEAD
+=======
+    // 6. Active JR Report (JR Nos, Customer Name, Skills, Active profiles in Pipeline)
+    const openJobs = await Job.find({ status: { $ne: 'Closed' } })
+      .populate('createdBy', 'name email employeeId role')
+      .lean();
+
+    const activeJRsReport = await Promise.all(openJobs.map(async (j) => {
+      const escapedTitle = (j.jobTitle || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const activeCandidates = await Candidate.find({
+        $or: [
+          { jrNumber: j.jrNumber },
+          { positionApplied: { $regex: `^${escapedTitle}$`, $options: 'i' } }
+        ],
+        status: { $nin: ['Rejected', 'Exited'] }
+      }).select('name phone email status currentStage assignedRecruiterName createdAt updatedAt').lean();
+
+      const isInterview = (s) => ['Interview Scheduled', 'Interview Completed', 'Shortlisted', 'HR Round Scheduled', 'Written Test', 'Test Select', 'Test Reject', 'Operations Round', 'HR Shortlist', 'L1/Final', 'Submitted to Client', 'Selected', 'Final Select', 'No Show', 'Final Round Scheduled', 'Final Round Completed'].includes(s);
+      const isOffered = (s) => ['Offered', 'Offer Released', 'Offer Accept', 'Offer Accepted', 'Documentation', 'Documentation Completed', 'Candidate Drop Post L2 Select'].includes(s);
+      const isYetToJoin = (s) => ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'].includes(s);
+      const isJoined = (s) => s === 'Joined';
+
+      let screeningCount = 0;
+      let interviewCount = 0;
+      let offeredCount = 0;
+      let yetToJoinCount = 0;
+      let joinedCount = 0;
+
+      activeCandidates.forEach(c => {
+        const s = c.status;
+        if (isJoined(s)) joinedCount++;
+        else if (isYetToJoin(s)) yetToJoinCount++;
+        else if (isOffered(s)) offeredCount++;
+        else if (isInterview(s)) interviewCount++;
+        else screeningCount++;
+      });
+
+      return {
+        _id: j._id,
+        jrNumber: j.jrNumber || '—',
+        customerName: j.companyName || j.client || '—',
+        jobTitle: j.jobTitle || '—',
+        skills: Array.isArray(j.skills) ? j.skills.join(', ') : (j.skills || '—'),
+        location: j.location || '—',
+        positions: j.positions || 1,
+        status: j.status || 'Open',
+        createdBy: j.createdBy?.name || j.recruiterName || 'Admin',
+        activeProfilesCount: activeCandidates.length,
+        screeningCount,
+        interviewCount,
+        offeredCount,
+        yetToJoinCount,
+        joinedCount,
+        activeCandidates: activeCandidates.map(c => ({
+          _id: c._id,
+          name: c.name,
+          phone: c.phone,
+          email: c.email,
+          status: c.status,
+          stage: c.currentStage,
+          recruiter: c.assignedRecruiterName || 'Unassigned',
+          updatedAt: c.updatedAt || c.createdAt
+        }))
+      };
+    }));
+
+    // 7. Active Status Profiles (Documentation process, Pending with Customer, etc.)
+    const activeProfilesCandidates = await Candidate.find({
+      status: { $nin: ['Rejected', 'Exited', 'Joined'] }
+    }).select('name phone email positionApplied clientName status jrNumber assignedRecruiterName updatedAt createdAt division').lean();
+
+    const activeProfilesReport = activeProfilesCandidates.map(c => {
+      const daysPending = Math.ceil((new Date() - new Date(c.updatedAt || c.createdAt)) / (1000 * 60 * 60 * 24));
+      return {
+        _id: c._id,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        positionApplied: c.positionApplied || '—',
+        clientName: c.clientName || '—',
+        status: c.status || 'Active',
+        jrNumber: c.jrNumber || '—',
+        recruiter: c.assignedRecruiterName || 'Unassigned',
+        division: c.division || 'BPO',
+        daysPending,
+        updatedAt: c.updatedAt || c.createdAt
+      };
+    }).sort((a, b) => b.daysPending - a.daysPending);
+
+    // 8. Revenue Report (ONLY Joined Candidates with CTC, Date of Joining & Customer/Division Breakdown)
+    const joinedCandidatesRaw = await Candidate.find({
+      status: 'Joined'
+    }).select('name phone email positionApplied clientName companyName division joiningSalary placementPercentage revenueGenerated offerDetails dateOfJoining expectedDateOfJoining assignedRecruiterName updatedAt createdAt').lean();
+
+    const joinedCandidatesList = joinedCandidatesRaw.map(c => {
+      let ctc = parseFloat(c.joiningSalary) || parseFloat(c.offerDetails?.joiningSalary) || parseFloat(c.offerDetails?.offeredCTC) || 0;
+      let rev = parseFloat(c.revenueGenerated) || 0;
+      if (!rev && ctc) {
+        const pct = parseFloat(c.placementPercentage) || parseFloat(c.offerDetails?.placementPercentage) || 8.33;
+        rev = (ctc * pct) / 100;
+      }
+      if (!rev) rev = 25000;
+
+      const doj = c.offerDetails?.dateOfJoining || c.dateOfJoining || c.expectedDateOfJoining || c.updatedAt || c.createdAt;
+      const dojStr = doj ? new Date(doj).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+      return {
+        _id: c._id,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        positionApplied: c.positionApplied || '—',
+        customerName: c.clientName || c.companyName || 'General / Unspecified',
+        division: c.division || 'BPO',
+        ctc,
+        doj: dojStr,
+        rawDoj: doj,
+        revenue: rev,
+        recruiter: c.assignedRecruiterName || 'Unassigned',
+        joinedDate: dojStr
+      };
+    });
+
+    const totalJoinedRevenue = joinedCandidatesList.reduce((sum, c) => sum + c.revenue, 0);
+
+    const customerRevMap = {};
+    const divisionRevMap = {};
+
+    joinedCandidatesList.forEach(c => {
+      const cust = c.customerName;
+      const div = c.division;
+
+      if (!customerRevMap[cust]) {
+        customerRevMap[cust] = { customerName: cust, joinedCount: 0, actualJoinedRevenue: 0 };
+      }
+      customerRevMap[cust].joinedCount += 1;
+      customerRevMap[cust].actualJoinedRevenue += c.revenue;
+
+      if (!divisionRevMap[div]) {
+        divisionRevMap[div] = { division: div, joinedCount: 0, actualJoinedRevenue: 0 };
+      }
+      divisionRevMap[div].joinedCount += 1;
+      divisionRevMap[div].actualJoinedRevenue += c.revenue;
+    });
+
+    const customerJoinedRevenue = Object.values(customerRevMap).sort((a, b) => b.actualJoinedRevenue - a.actualJoinedRevenue);
+    const divisionJoinedRevenue = Object.values(divisionRevMap).sort((a, b) => b.actualJoinedRevenue - a.actualJoinedRevenue);
+
+    const expectedRevenueReport = {
+      joinedCandidates: joinedCandidatesList,
+      customerRevenue: customerJoinedRevenue,
+      divisionRevenue: divisionJoinedRevenue,
+      totalJoinedRevenue,
+      totalJoinedCount: joinedCandidatesList.length,
+      // Backward compatibility keys
+      totalExpectedRevenue: totalJoinedRevenue,
+    };
+
+    // 9. Lead and Recruiter Performance Report (Flat List & Team-Wise Hierarchy)
+    const usersList = await User.find({ role: { $in: ['recruiter', 'tl', 'manager', 'admin'] } }).select('name role employeeId').lean();
+
+    const getMetricsForUser = async (u) => {
+      const candidateMatch = selectedRange === 'all'
+        ? { $or: [{ assignedRecruiter: u._id }, { assignedRecruiterName: u.name }] }
+        : { $or: [{ assignedRecruiter: u._id }, { assignedRecruiterName: u.name }], createdAt: { $gte: start, $lt: end } };
+
+      const submitted = await Candidate.countDocuments(candidateMatch);
+      const selects = await Candidate.countDocuments({
+        ...candidateMatch,
+        status: { $in: ['Selected', 'Offer Released', 'Offer Accepted', 'Yet To Join', 'Joined'] }
+      });
+      const joinees = await Candidate.countDocuments({
+        ...candidateMatch,
+        status: 'Joined'
+      });
+
+      return {
+        userId: u._id,
+        name: u.name,
+        employeeId: u.employeeId || '—',
+        role: u.role === 'tl' ? 'Team Lead' : (u.role === 'recruiter' ? 'Recruiter' : u.role.toUpperCase()),
+        submitted,
+        selects,
+        joinees,
+        joineesVsSubmittedRatio: submitted > 0 ? `${((joinees / submitted) * 100).toFixed(1)}%` : '0.0%',
+        joineesVsSelectsRatio: selects > 0 ? `${((joinees / selects) * 100).toFixed(1)}%` : '0.0%',
+      };
+    };
+
+    const leadRecruiterPerformanceReport = await Promise.all(usersList.map(u => getMetricsForUser(u)));
+
+    const activeLeadRecruiterPerformance = leadRecruiterPerformanceReport
+      .filter(r => r.submitted > 0 || r.selects > 0 || r.joinees > 0)
+      .sort((a, b) => b.joinees - a.joinees || b.selects - a.selects || b.submitted - a.submitted);
+
+    // Build Team-Wise hierarchy (Team Lead -> Members)
+    const allTls = await User.find({ role: 'tl' }).select('name role employeeId').lean();
+    const teamAssignments = await TeamMember.find({ removedAt: null }).populate('memberId', 'name role employeeId').lean();
+
+    const tlMembersMap = {};
+    const assignedMemberSet = new Set();
+
+    teamAssignments.forEach(ta => {
+      if (ta.teamLeaderId && ta.memberId) {
+        const tlIdStr = ta.teamLeaderId.toString();
+        if (!tlMembersMap[tlIdStr]) tlMembersMap[tlIdStr] = [];
+        tlMembersMap[tlIdStr].push(ta.memberId);
+        assignedMemberSet.add(ta.memberId._id.toString());
+      }
+    });
+
+    const teamWiseReport = await Promise.all(allTls.map(async (tl) => {
+      const tlMetrics = await getMetricsForUser(tl);
+      const members = tlMembersMap[tl._id.toString()] || [];
+      const memberMetrics = await Promise.all(members.map(m => getMetricsForUser(m)));
+
+      const totalSubmitted = tlMetrics.submitted + memberMetrics.reduce((s, m) => s + m.submitted, 0);
+      const totalSelects = tlMetrics.selects + memberMetrics.reduce((s, m) => s + m.selects, 0);
+      const totalJoinees = tlMetrics.joinees + memberMetrics.reduce((s, m) => s + m.joinees, 0);
+
+      return {
+        teamLeader: {
+          ...tlMetrics,
+          totalSubmitted,
+          totalSelects,
+          totalJoinees,
+          totalJoineesVsSubmittedRatio: totalSubmitted > 0 ? `${((totalJoinees / totalSubmitted) * 100).toFixed(1)}%` : '0.0%',
+          totalJoineesVsSelectsRatio: totalSelects > 0 ? `${((totalJoinees / totalSelects) * 100).toFixed(1)}%` : '0.0%',
+        },
+        members: memberMetrics.sort((a, b) => b.joinees - a.joinees || b.selects - a.selects || b.submitted - a.submitted)
+      };
+    }));
+
+    // Find direct / unassigned recruiters
+    const unassignedRecruiters = await User.find({
+      role: 'recruiter',
+      _id: { $nin: Array.from(assignedMemberSet) }
+    }).select('name role employeeId').lean();
+
+    const unassignedMetrics = (await Promise.all(unassignedRecruiters.map(m => getMetricsForUser(m))))
+      .sort((a, b) => b.joinees - a.joinees || b.selects - a.selects || b.submitted - a.submitted);
+
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     res.json({
       recruiterReport,
       customerReport,
@@ -774,7 +1278,19 @@ exports.advancedReports = async (req, res, next) => {
         avgStageAging,
         candidates: agingCandidates.slice(0, 100) // limit to top 100 for performance
       },
+<<<<<<< HEAD
       conversionReport
+=======
+      conversionReport,
+      activeJRsReport,
+      activeProfilesReport,
+      expectedRevenueReport,
+      leadRecruiterPerformanceReport: activeLeadRecruiterPerformance,
+      teamWisePerformanceReport: {
+        teams: teamWiseReport,
+        unassignedMembers: unassignedMetrics
+      }
+>>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     });
   } catch (err) {
     next(err);
