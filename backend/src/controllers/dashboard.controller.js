@@ -1096,7 +1096,20 @@ exports.advancedReports = async (req, res, next) => {
     // 7. Active Status Profiles (Documentation process, Pending with Customer, etc.)
     const activeProfilesCandidates = await Candidate.find({
       status: { $nin: ['Rejected', 'Exited', 'Joined'] }
-    }).select('name phone email positionApplied clientName status jrNumber assignedRecruiterName updatedAt createdAt division').lean();
+    }).select('name phone email positionApplied clientName status jrNumber assignedRecruiter assignedRecruiterName updatedAt createdAt division').lean();
+
+    const recruiterIds = [...new Set(activeProfilesCandidates.map(c => c.assignedRecruiter?.toString()).filter(Boolean))];
+    const TeamMember = mongoose.models.TeamMember || require('../models/TeamMember');
+    const teamMembers = await TeamMember.find({ memberId: { $in: recruiterIds }, removedAt: null })
+      .populate('teamLeaderId', 'name')
+      .lean();
+    
+    const recruiterToTLMap = {};
+    teamMembers.forEach(tm => {
+      if (tm.teamLeaderId) {
+        recruiterToTLMap[tm.memberId.toString()] = tm.teamLeaderId.name;
+      }
+    });
 
     const activeProfilesReport = activeProfilesCandidates.map(c => {
       const daysPending = Math.ceil((new Date() - new Date(c.updatedAt || c.createdAt)) / (1000 * 60 * 60 * 24));
@@ -1110,6 +1123,7 @@ exports.advancedReports = async (req, res, next) => {
         status: c.status || 'Active',
         jrNumber: c.jrNumber || '—',
         recruiter: c.assignedRecruiterName || 'Unassigned',
+        teamLeader: (c.assignedRecruiter && recruiterToTLMap[c.assignedRecruiter.toString()]) ? recruiterToTLMap[c.assignedRecruiter.toString()] : 'Unassigned',
         division: c.division || 'BPO',
         daysPending,
         updatedAt: c.updatedAt || c.createdAt

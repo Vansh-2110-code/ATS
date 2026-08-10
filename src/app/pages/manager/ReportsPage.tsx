@@ -475,6 +475,7 @@ export function ReportsPage() {
                     <th className="px-4 py-3 font-semibold">Active Status</th>
                     <th className="px-4 py-3 font-semibold">JR Number</th>
                     <th className="px-4 py-3 font-semibold">Recruiter</th>
+                    <th className="px-4 py-3 font-semibold">Team Leader</th>
                     <th className="px-4 py-3 font-semibold text-center">Days Pending</th>
                   </tr>
                 </thead>
@@ -497,6 +498,7 @@ export function ReportsPage() {
                         </td>
                         <td className="px-4 py-3.5 font-mono text-slate-600">{c.jrNumber}</td>
                         <td className="px-4 py-3.5 text-slate-600">{c.recruiter}</td>
+                        <td className="px-4 py-3.5 text-slate-600">{c.teamLeader}</td>
                         <td className="px-4 py-3.5 text-center">
                           <span className={`px-2 py-0.5 rounded font-semibold ${
                             c.daysPending > 14 ? 'bg-red-100 text-red-700' :
