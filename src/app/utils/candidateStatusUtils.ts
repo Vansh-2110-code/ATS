@@ -2,7 +2,7 @@
 // OFFICIAL 32 CANDIDATE STATUSES & ROLE RESTRICTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Statuses 1 to 17: Accessible to Recruiter, Team Lead, Manager, Admin
+// Statuses 1 to 17: Accessible to ALL roles (Recruiter, TL, Manager, Admin, HR, Management, etc.)
 export const RECRUITER_STATUSES = [
   'Eligible',
   'Not Eligible',
@@ -23,7 +23,7 @@ export const RECRUITER_STATUSES = [
   'Candidate Drop During Final Stage',
 ] as const;
 
-// Statuses 18 to 31: Restricted to Team Lead, Manager, Admin only
+// Statuses 18 to 31: NOT accessible by Recruiter. Remaining ALL roles have access (TL, Manager, Admin, HR, etc.)
 export const TL_MANAGEMENT_STATUSES = [
   'L1 Select',
   'L1 Reject',
@@ -41,7 +41,7 @@ export const TL_MANAGEMENT_STATUSES = [
   'Joined and Abort',
 ] as const;
 
-// Status 32: Accessible to All roles
+// Status 32: Accessible to ALL roles
 export const GLOBAL_STATUSES = [
   'Black List',
 ] as const;
@@ -56,7 +56,7 @@ export const CANDIDATE_STATUS_OPTIONS = [
 export type CandidateStatus = typeof CANDIDATE_STATUS_OPTIONS[number];
 
 /**
- * Returns true if the status is restricted to TL / Manager / Admin only.
+ * Returns true if the status is in 18 to 31 (restricted for recruiters).
  */
 export function isTLOnlyStatus(status: string): boolean {
   return (TL_MANAGEMENT_STATUSES as readonly string[]).includes(status);
@@ -64,12 +64,13 @@ export function isTLOnlyStatus(status: string): boolean {
 
 /**
  * Validates if the user's role allows setting/updating candidate to the given status.
+ * Rule: 1-17 accessible by all, 18-31 not accessible by recruiter (all other roles have access), 32 accessible by all.
  */
 export function canUserUpdateCandidateStatus(status: string, role?: string): boolean {
   if (!role) return false;
-  const isTLOrAbove = ['admin', 'tl', 'manager'].includes(role);
+  const normalizedRole = role.toLowerCase().trim();
   if (isTLOnlyStatus(status)) {
-    return isTLOrAbove;
+    return normalizedRole !== 'recruiter';
   }
   return true;
 }
@@ -79,14 +80,16 @@ export function canUserUpdateCandidateStatus(status: string, role?: string): boo
  */
 export function getAccessibleStatusesForRole(role?: string): string[] {
   if (!role) return [...RECRUITER_STATUSES, ...GLOBAL_STATUSES];
-  if (['admin', 'tl', 'manager'].includes(role)) {
-    return [...CANDIDATE_STATUS_OPTIONS];
+  const normalizedRole = role.toLowerCase().trim();
+  if (normalizedRole === 'recruiter') {
+    return [...RECRUITER_STATUSES, ...GLOBAL_STATUSES];
   }
-  return [...RECRUITER_STATUSES, ...GLOBAL_STATUSES];
+  // All remaining roles have full access to all 32 statuses
+  return [...CANDIDATE_STATUS_OPTIONS];
 }
 
 export const CANDIDATE_STATUS_COLORS: Record<string, string> = {
-  // 1-17: Recruiter & TL Statuses
+  // 1-17: All Roles Statuses
   Eligible: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'Not Eligible': 'bg-red-100 text-red-700 border-red-200',
   'No Response': 'bg-slate-100 text-slate-600 border-slate-200',
@@ -107,7 +110,7 @@ export const CANDIDATE_STATUS_COLORS: Record<string, string> = {
   'Candidate Drop Post L2 Select': 'bg-orange-100 text-orange-800 border-orange-200',
   'Candidate Drop During Final Stage': 'bg-red-100 text-red-800 border-red-200',
 
-  // 18-31: TL & Management Statuses
+  // 18-31: Restricted for Recruiters, Accessible to All Other Roles
   'L1 Select': 'bg-emerald-100 text-emerald-800 border-emerald-300 font-medium',
   'L1 Reject': 'bg-red-100 text-red-800 border-red-300 font-medium',
   'L2 Select': 'bg-teal-100 text-teal-800 border-teal-300 font-medium',
@@ -124,7 +127,7 @@ export const CANDIDATE_STATUS_COLORS: Record<string, string> = {
   Joined: 'bg-emerald-200 text-emerald-900 border-emerald-400 font-semibold',
   'Joined and Abort': 'bg-rose-200 text-rose-900 border-rose-400 font-semibold',
 
-  // 32: Global Status
+  // 32: Global Status (All Roles)
   'Black List': 'bg-stone-800 text-white border-stone-900 font-semibold',
 
   // Backward compatibility legacy aliases

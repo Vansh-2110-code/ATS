@@ -1771,8 +1771,8 @@ export function AddCandidatePage() {
                         <option key={st} value={st}>{st}</option>
                       ))}
                     </optgroup>
-                    {['admin', 'tl', 'manager'].includes(user?.role || '') && (
-                      <optgroup label="TL & Management Statuses (18–31)">
+                    {user?.role?.toLowerCase() !== 'recruiter' && (
+                      <optgroup label="Statuses 18–31 (TL, Manager, Admin & All Other Roles)">
                         {TL_MANAGEMENT_STATUSES.map(st => (
                           <option key={st} value={st}>{st}</option>
                         ))}

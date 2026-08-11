@@ -1681,11 +1681,11 @@ export function CandidateProfilePage() {
             )}
 
             <div className="space-y-4 max-h-[520px] overflow-y-auto pr-1">
-              {/* 1. Recruiter & TL Statuses (1 to 17) */}
+              {/* 1. Statuses 1 to 17 (All Roles) */}
               <div>
                 <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
-                  <span>Recruiter & TL Statuses (1–17)</span>
-                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">All Recruiters</span>
+                  <span>Statuses 1–17 (All Roles)</span>
+                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold">Accessible to All</span>
                 </div>
                 <div className="space-y-1.5">
                   {RECRUITER_STATUSES.map(s => (
@@ -1703,12 +1703,12 @@ export function CandidateProfilePage() {
                 </div>
               </div>
 
-              {/* 2. TL & Management Statuses (18 to 31) */}
+              {/* 2. Statuses 18 to 31 (All Roles Except Recruiter) */}
               <div>
                 <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
-                  <span>TL & Management Statuses (18–31)</span>
-                  <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded flex items-center gap-1">
-                    <Lock className="w-2.5 h-2.5" /> TL / Admin Only
+                  <span>Statuses 18–31</span>
+                  <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> All Except Recruiter
                   </span>
                 </div>
                 <div className="space-y-1.5">
@@ -1717,7 +1717,7 @@ export function CandidateProfilePage() {
                     return (
                       <button key={s} onClick={() => handleStatusUpdate(s)}
                         disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager}
-                        title={isRestricted ? 'Restricted: Only Team Leads, Managers, and Admins can assign this status' : ''}
+                        title={isRestricted ? 'Restricted: Recruiters cannot assign statuses 18–31. All other roles have permission.' : ''}
                         className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                           status === s
                             ? (STATUS_COLORS[s] || 'bg-indigo-100 text-indigo-700 border-indigo-200') + ' border font-semibold'
@@ -1736,11 +1736,11 @@ export function CandidateProfilePage() {
                 </div>
               </div>
 
-              {/* 3. Global Status (32: Black List) */}
+              {/* 3. Status 32: Black List (All Roles) */}
               <div>
                 <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
-                  <span>Global Status (32)</span>
-                  <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">All Roles</span>
+                  <span>Status 32</span>
+                  <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">Accessible to All</span>
                 </div>
                 <div className="space-y-1.5">
                   {GLOBAL_STATUSES.map(s => (

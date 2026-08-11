@@ -859,8 +859,8 @@ exports.updateStatus = async (req, res, next) => {
       'Documentation Completed', 'Documentation Incomplete', 'Waiting for Offer',
       'Offer Accept', 'Offer Reject', 'Joined', 'Joined and Abort'
     ];
-    if (TL_MANAGEMENT_STATUSES.includes(status) && req.user.role === 'recruiter') {
-      return res.status(403).json({ message: 'Access Denied: Only Team Leads, Managers, and Admins can assign this status.' });
+    if (TL_MANAGEMENT_STATUSES.includes(status) && req.user?.role?.toLowerCase() === 'recruiter') {
+      return res.status(403).json({ message: 'Access Denied: Statuses 18–31 cannot be assigned by recruiters. All other roles have permission.' });
     }
 
     if (candidate.isDuplicate && req.user.role !== 'admin') {
