@@ -257,7 +257,7 @@ exports.tlDashboard = async (req, res, next) => {
         { $match: { 'notes.createdAt': { $gte: today, $lt: tomorrow } } },
         { $count: 'count' },
       ]);
-      const todayCalls = callsAgg[0]?.count || 0;
+      const todayCalls = todayCallsAgg[0]?.count || 0;
 
       // Count candidates with interview scheduled today
       const todayInterviews = await Candidate.countDocuments({
@@ -283,13 +283,6 @@ exports.tlDashboard = async (req, res, next) => {
         ...extraFilter,
         status: { $nin: ['Rejected', 'Joined'] },
       });
-
-      const totalCallsAgg = await Candidate.aggregate([
-        { $match: { assignedRecruiter: r._id } },
-        { $unwind: '$notes' },
-        { $count: 'count' },
-      ]);
-      const totalCalls = totalCallsAgg[0]?.count || 0;
 
       const totalInterviewsScheduled = await Candidate.countDocuments({
         assignedRecruiter: r._id,
