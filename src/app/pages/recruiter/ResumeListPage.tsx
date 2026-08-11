@@ -60,13 +60,28 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
   const locationState = location.state as { statusFilter?: string; todayCalls?: boolean } | null;
 
   const [search, setSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('All Sources');
+  const [recruiterFilter, setRecruiterFilter] = useState('All Recruiters');
+  const [companyFilter, setCompanyFilter] = useState('All Companies');
   const [statusFilter, setStatusFilter] = useState(() => lockedStatus || locationState?.statusFilter || 'All Status');
-  const [cityFilter, setCityFilter] = useState('');
-  const [localAreaFilter, setLocalAreaFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [recruiters, setRecruiters] = useState<any[]>([]);
+
+  // Load Companies & Recruiters list for filter dropdowns
+  useEffect(() => {
+    Promise.all([
+      (api as any).getCompanyList ? (api as any).getCompanyList() : (api as any).getCompanies ? (api as any).getCompanies() : Promise.resolve([]),
+      (api as any).getRecruiters ? (api as any).getRecruiters() : Promise.resolve([]),
+    ]).then(([compData, recData]: any) => {
+      const rawComps = Array.isArray(compData) ? compData : (compData?.companies || []);
+      const rawRecs = Array.isArray(recData) ? recData : (recData?.users || recData?.recruiters || []);
+      setCompanies(dedupeCompanies(rawComps));
+      setRecruiters(rawRecs);
+    }).catch(console.error);
+  }, []);
 
   // Reassign Modal State
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
@@ -192,8 +207,9 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
         setLoading(true);
         const params: Record<string, string> = { limit: '1000' };
         if (search) params.search = search;
-        if (sourceFilter !== 'All Sources') params.source = sourceFilter;
         if (statusFilter !== 'All Status') params.status = statusFilter;
+        if (companyFilter && companyFilter !== 'All Companies') params.company = companyFilter;
+        if (recruiterFilter && recruiterFilter !== 'All Recruiters') params.recruiter = recruiterFilter;
         const data = await api.getCandidates(params);
         const list = data.candidates || data || [];
         setCandidates(list.map((c: any) => ({
@@ -209,9 +225,11 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
           localArea: c.localArea || '',
           resumePath: c.resumePath || '',
           recruiter: c.assignedRecruiterName || 'Unassigned',
+          assignedRecruiter: c.assignedRecruiter || '',
           phone: c.phone || '',
           positionApplied: c.positionApplied || '',
-          clientName: c.clientName || '',
+          clientName: c.clientName || c.company || '',
+          company: c.clientName || c.company || '',
         })));
       } catch (err) {
         console.error('Failed to load candidates:', err);
@@ -220,7 +238,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
       }
     };
     fetchCandidates();
-  }, []);
+  }, [search, statusFilter, companyFilter, recruiterFilter, locationState?.todayCalls]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -367,24 +385,38 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
 
   const filtered = candidates.filter(c => {
     const matchSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.skills.toLowerCase().includes(search.toLowerCase());
-    const matchSource = sourceFilter === 'All Sources' || c.source === sourceFilter;
-    const matchStatus = statusFilter === 'All Status' || c.status === statusFilter;
-    const matchCity = !cityFilter || c.city === cityFilter;
-    const matchArea = !localAreaFilter || c.localArea === localAreaFilter;
-    return matchSearch && matchSource && matchStatus && matchCity && matchArea;
+      (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.skills || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.candidateId || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.phone || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.email || '').toLowerCase().includes(search.toLowerCase());
+    const matchStatus =
+      statusFilter === 'All Status' ||
+      c.status === statusFilter ||
+      ((statusFilter === 'Eligible' || statusFilter === 'Eligible Candidates') && (c.status === 'Eligible' || c.status === 'Eligible Candidates'));
+    const matchCompany =
+      companyFilter === 'All Companies' ||
+      !companyFilter ||
+      (c.clientName || '').toLowerCase() === companyFilter.toLowerCase() ||
+      (c.company || '').toLowerCase() === companyFilter.toLowerCase();
+    const matchRecruiter =
+      recruiterFilter === 'All Recruiters' ||
+      !recruiterFilter ||
+      c.recruiter === recruiterFilter ||
+      String(c.assignedRecruiter || '') === recruiterFilter ||
+      (c.recruiter && recruiterFilter && c.recruiter.toLowerCase() === recruiterFilter.toLowerCase());
+    return matchSearch && matchStatus && matchCompany && matchRecruiter;
   });
 
   const hasActiveFilters =
-    sourceFilter !== 'All Sources' || statusFilter !== 'All Status' ||
-    !!cityFilter || !!localAreaFilter;
+    statusFilter !== 'All Status' ||
+    (companyFilter !== 'All Companies' && !!companyFilter) ||
+    (recruiterFilter !== 'All Recruiters' && !!recruiterFilter);
 
   const clearAll = () => {
-    setSourceFilter('All Sources');
     setStatusFilter('All Status');
-    setCityFilter('');
-    setLocalAreaFilter('');
+    setCompanyFilter('All Companies');
+    setRecruiterFilter('All Recruiters');
   };
 
   const visibleCount = Object.values(visibleCols).filter(Boolean).length;
@@ -672,66 +704,57 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
 
         {/* Expanded Filters */}
         {showFilters && (
-          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-3 items-center">
-            {/* Source */}
-            <div>
-              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Source</label>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-4 items-center">
+            {/* Recruiter Filter */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Recruiter</label>
               <select
-                value={sourceFilter}
-                onChange={e => setSourceFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
+                value={recruiterFilter}
+                onChange={e => setRecruiterFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
               >
-                {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="All Recruiters">All Recruiters</option>
+                {recruiters.map(r => {
+                  const rName = typeof r === 'string' ? r : (r.name || r.userName || r.email);
+                  const rId = typeof r === 'string' ? r : (r._id || r.id || r.name);
+                  return <option key={rId} value={rName}>{rName}</option>;
+                })}
               </select>
             </div>
 
-            {/* Status (Hidden if locked) */}
+            {/* Company Filter */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Company</label>
+              <select
+                value={companyFilter}
+                onChange={e => setCompanyFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
+              >
+                <option value="All Companies">All Companies</option>
+                {companies.filter(Boolean).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status Filter (Hidden if locked) */}
             {!lockedStatus && (
-              <div>
+              <div className="flex-1 min-w-[200px]">
                 <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Status</label>
                 <select
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
                 >
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             )}
 
-            {/* City */}
-            <div>
-              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>City</label>
-              <select
-                value={cityFilter}
-                onChange={e => { setCityFilter(e.target.value); setLocalAreaFilter(''); }}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
-              >
-                <option value="">All Cities</option>
-                {CITIES.filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            {/* Local Area */}
-            <div>
-              <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Local Area</label>
-              <select
-                value={localAreaFilter}
-                onChange={e => setLocalAreaFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
-                disabled={!cityFilter}
-              >
-                <option value="">All Areas</option>
-                {(LOCAL_AREAS[cityFilter] ?? []).filter(Boolean).map(a => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </select>
-            </div>
-
             {hasActiveFilters && (
               <button
                 onClick={clearAll}
-                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 self-end pb-0.5"
+                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 self-end pb-2 cursor-pointer ml-auto"
               >
                 <X className="w-3.5 h-3.5" /> Clear all
               </button>
