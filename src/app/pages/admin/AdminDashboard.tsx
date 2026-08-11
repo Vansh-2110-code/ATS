@@ -135,6 +135,9 @@ export function AdminDashboard() {
   const [activeDivision, setActiveDivision] = useState<'BPO' | 'IT' | 'Lateral'>('BPO');
   const [divisionData, setDivisionData] = useState<any>(null);
   const [divLoading, setDivLoading] = useState(false);
+  const [divTlFilter, setDivTlFilter] = useState('All TLs');
+  const [divRecruiterFilter, setDivRecruiterFilter] = useState('All Recruiters');
+  const [divCompanyFilter, setDivCompanyFilter] = useState('All Companies');
 
   // ── Recruiter state ─────────────────────────────────────────────────────────
   const [dateRange, setDateRange]   = useState<DateRange>('Day');
