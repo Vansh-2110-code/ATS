@@ -97,9 +97,9 @@ export function SlicerFilteredDataView({
         } else if (slicerName === 'Interview Stage' || slicerName === 'Interview' || slicerName === 'interview') {
           params.statusIn = 'Interview Scheduled,Interview Rescheduled,Interview Completed,Interview,Selected for Interview,Written Test,Operations Round,Interview Feedback Pending,Test Select,Test Reject';
         } else if (slicerName === 'Offer Accept' || slicerName === 'Offer' || slicerName === 'offer') {
-          params.statusIn = 'Offer Accept,Offer Accepted,Offered,Offer Released';
+          params.statusIn = 'Offer Accept,Offer Accepted,Offered,Offer Released,Waiting for Offer';
         } else if (slicerName === 'Offered / Selected' || slicerName === 'Offer Selected' || slicerName === 'offerSelected' || slicerName === 'offered') {
-          params.statusIn = 'Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,L2 Select,Final Select,VNA Select,Client Select';
+          params.statusIn = 'Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,L2 Select,Final Select,VNA Select,Client Select,Test Select';
         } else if (slicerName === 'Yet To Join' || slicerName === 'yetToJoin') {
           params.statusIn = 'Yet To Join,Joining Date Confirmed,Joining Postponed';
         } else if (slicerName === 'Joined Candidates' || slicerName === 'joined' || slicerName === 'Joined') {
@@ -109,9 +109,9 @@ export function SlicerFilteredDataView({
         } else if (slicerName === 'Documentation' || slicerName === 'Document Pending') {
           params.statusIn = 'Documentation,Document Pending,Documentation Completed,Documentation Incomplete,Documennt Initialted,Document Initialized';
         } else if (slicerName === '__final_select_group') {
-          params.statusIn = 'Final Select,Final Round Scheduled,Final Round Completed,L1 Select,Client Select,Selected';
+          params.statusIn = 'Final Select,Final Round Scheduled,Final Round Completed,L1 Select,L2 Select,Test Select,VNA Select,Client Select,Selected';
         } else if (slicerName === '__waiting_for_offer_group') {
-          params.statusIn = 'Offer Released,Yet To Join,Documentation in Progress,Documentation';
+          params.statusIn = 'Offer Released,Yet To Join,Documentation in Progress,Documentation,Waiting for Offer';
         } else if (slicerName === 'Today Calls') {
           params.calledToday = 'true';
         } else if (slicerName === 'Follow-Ups') {
