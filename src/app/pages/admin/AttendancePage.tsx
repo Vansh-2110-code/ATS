@@ -30,6 +30,25 @@ const HOLIDAY_TYPE_STYLES: Record<string, string> = {
   Optional: 'bg-slate-100 text-slate-600',
 };
 
+const formatAttendanceTime = (val: any): string => {
+  if (!val || val === '—' || val === 'N/A' || val === 'null' || val === 'undefined') return '—';
+  if (typeof val === 'string' && /^\d{1,2}:\d{2}(\s*(AM|PM))?$/i.test(val.trim())) {
+    return val.trim();
+  }
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    });
+  } catch {
+    return String(val);
+  }
+};
+
 export function AttendancePage() {
   const [search, setSearch] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -59,8 +78,8 @@ export function AttendancePage() {
           id: e.employeeId || e._id || e.id,
           name: e.user?.name || e.name || '',
           role: e.user?.role || e.role || '',
-          login: e.loginTime || e.login || '—',
-          logout: e.logoutTime || e.logout || '—',
+          login: formatAttendanceTime(e.loginTime || e.login),
+          logout: formatAttendanceTime(e.logoutTime || e.logout),
           wfh: e.isWFH ?? e.wfh ?? false,
           status: e.status || 'Absent',
         }));

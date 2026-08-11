@@ -914,7 +914,8 @@ exports.divisionDashboard = async (req, res, next) => {
       yetToJoinCount,
       joinedCount,
       joinedCandidates,
-      yetToJoinCandidates
+      yetToJoinCandidates,
+      offeredCandidates
     ] = await Promise.all([
       Candidate.countDocuments(screeningMatch),
       Candidate.countDocuments(interviewMatch),
@@ -925,6 +926,9 @@ exports.divisionDashboard = async (req, res, next) => {
         .select('name positionApplied clientName dateOfJoining assignedRecruiterName status')
         .sort('-dateOfJoining'),
       Candidate.find(yetToJoinMatch)
+        .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status candidateStatusPostOffer')
+        .sort('-createdAt'),
+      Candidate.find(offerMatch)
         .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status candidateStatusPostOffer')
         .sort('-createdAt')
     ]);
@@ -944,7 +948,8 @@ exports.divisionDashboard = async (req, res, next) => {
         joined: joinedCount,
       },
       joinedCandidates,
-      yetToJoinCandidates
+      yetToJoinCandidates,
+      offeredCandidates
     });
   } catch (err) {
     next(err);

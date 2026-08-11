@@ -138,7 +138,7 @@ export function AdminDashboard() {
   const [activeDivision, setActiveDivision] = useState<'BPO' | 'IT' | 'Lateral'>('BPO');
   const [divisionData, setDivisionData] = useState<any>(null);
   const [divLoading, setDivLoading] = useState(false);
-  const [divCandidateSlicer, setDivCandidateSlicer] = useState<'all' | 'yetToJoin' | 'joined'>('all');
+  const [divCandidateSlicer, setDivCandidateSlicer] = useState<'all' | 'offered' | 'yetToJoin' | 'joined'>('all');
   const [divCompanyFilter, setDivCompanyFilter] = useState<string>('All Companies');
   const [divTlFilter, setDivTlFilter] = useState<string>('All Team Leaders');
   const [divRecruiterFilter, setDivRecruiterFilter] = useState<string>('All Recruiters');
@@ -1045,7 +1045,7 @@ export function AdminDashboard() {
                   { label: 'Open Positions', value: divisionData.openPositions, color: 'text-indigo-600', bg: 'bg-indigo-50', link: `/admin/jobs?division=${activeDivision}&status=Open&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&company=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Screening Round', value: divisionData.pipeline?.screening || 0, color: 'text-amber-600', bg: 'bg-amber-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Eligible,Screening,Shortlisted,Submitted to Client,Submitted To Client,Sublitted To Client,Walkin Company,Walkin WHM,Call Back,Hold,No Response,Duplicate-Client,Walk-in Submitted,Contacted,Interested,Selected for Call,New,HR Shortlist')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Interview Stage', value: divisionData.pipeline?.interview || 0, color: 'text-violet-600', bg: 'bg-violet-50', link: `/admin/candidates?statusIn=${encodeURIComponent('VNA Select,Test Select,L1 Select,L2 Select,Final Select,Interview Scheduled,Interview Rescheduled,Interview Completed,Interview,Selected for Interview,Written Test,Operations Round,Interview Feedback Pending')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
-                  { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,Client Select,Final Select')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', slicerKey: 'offered', link: `/admin/candidates?statusIn=${encodeURIComponent('Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,Client Select,Final Select')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Yet To Join', value: divisionData.pipeline?.yetToJoin || 0, color: 'text-purple-600', bg: 'bg-purple-50', slicerKey: 'yetToJoin', link: `/admin/candidates?statusIn=${encodeURIComponent('Yet To Join,Joining Date Confirmed,Joining Postponed')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Joined Candidates', value: divisionData.pipeline?.joined || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', slicerKey: 'joined', link: `/admin/candidates?statusFilter=Joined&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                 ].map((s, i) => (
@@ -1086,9 +1086,19 @@ export function AdminDashboard() {
                         }`}
                     >
                       All Candidates ({(
-                        [...(divisionData.yetToJoinCandidates || []), ...(divisionData.joinedCandidates || [])]
+                        [...(divisionData.offeredCandidates || []), ...(divisionData.yetToJoinCandidates || []), ...(divisionData.joinedCandidates || [])]
                           .filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length
                       )})
+                    </button>
+                    <button
+                      onClick={() => setDivCandidateSlicer('offered')}
+                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${divCandidateSlicer === 'offered' ? 'bg-pink-600 text-white shadow-sm' : 'text-pink-700 hover:bg-pink-50'
+                        }`}
+                    >
+                      <span>Offered / Selected</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${divCandidateSlicer === 'offered' ? 'bg-pink-700 text-white' : 'bg-pink-100 text-pink-800'}`}>
+                        {(divisionData.offeredCandidates || []).filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length}
+                      </span>
                     </button>
                     <button
                       onClick={() => setDivCandidateSlicer('yetToJoin')}
@@ -1112,6 +1122,61 @@ export function AdminDashboard() {
                     </button>
                   </div>
                 </div>
+
+                {/* Offered / Selected Candidate Table */}
+                {(divCandidateSlicer === 'offered' || divCandidateSlicer === 'all') && (
+                  <div className="border-b border-slate-100 last:border-b-0">
+                    <div className="bg-pink-50/50 px-5 py-2.5 border-b border-pink-100/50 flex justify-between items-center">
+                      <span className="text-xs font-bold text-pink-900 uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-pink-600"></span>
+                        Offered / Selected Candidates ({(divisionData.offeredCandidates || []).filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length})
+                        {divCompanyFilter !== 'All Companies' && <span className="text-pink-500 font-normal normal-case">· {divCompanyFilter}</span>}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 text-left text-xs text-slate-500 uppercase tracking-wide">
+                            <th className="px-5 py-3 font-semibold">Candidate Name</th>
+                            <th className="px-5 py-3 font-semibold">Position Applied</th>
+                            <th className="px-5 py-3 font-semibold">Company / Client</th>
+                            <th className="px-5 py-3 font-semibold">Recruiter</th>
+                            <th className="px-5 py-3 font-semibold">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 text-slate-700">
+                          {(() => {
+                            const rows = (divisionData.offeredCandidates || []).filter((c: any) =>
+                              divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter
+                            );
+                            if (rows.length === 0) return (
+                              <tr>
+                                <td colSpan={5} className="text-center py-8 text-slate-400 text-sm">
+                                  {divCompanyFilter !== 'All Companies'
+                                    ? `No 'Offered / Selected' candidates for ${divCompanyFilter} under ${activeDivision}.`
+                                    : `No candidates marked 'Offered / Selected' under ${activeDivision} division.`}
+                                </td>
+                              </tr>
+                            );
+                            return rows.map((c: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-5 py-3 font-medium text-slate-900">{c.name}</td>
+                                <td className="px-5 py-3">{c.positionApplied || '—'}</td>
+                                <td className="px-5 py-3 font-medium text-blue-600">{c.clientName || '—'}</td>
+                                <td className="px-5 py-3 text-slate-500 text-xs">{c.assignedRecruiterName || '—'}</td>
+                                <td className="px-5 py-3">
+                                  <span className="px-2.5 py-1 text-xs font-semibold bg-pink-100 text-pink-700 rounded-full border border-pink-200">
+                                    {c.status || 'Offered'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 {/* Candidate Table Render */}
                 {(divCandidateSlicer === 'yetToJoin' || divCandidateSlicer === 'all') && (

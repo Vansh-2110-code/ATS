@@ -272,15 +272,19 @@ exports.employeeDetail = async (req, res, next) => {
       });
     }
 
-    // Activity — format times as HH:MM and compute flags
+    // Activity — format times as HH:MM AM/PM in IST and compute flags
     const toHHMM = (dt) => {
       if (!dt) return '—';
-      const d = new Date(dt);
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const d = getKolkataDate(new Date(dt));
+      const hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const h12 = hours % 12 || 12;
+      return `${String(h12).padStart(2, '0')}:${minutes} ${ampm}`;
     };
     const toMins = (dt) => {
       if (!dt) return null;
-      const d = new Date(dt);
+      const d = getKolkataDate(new Date(dt));
       return d.getHours() * 60 + d.getMinutes();
     };
     const WORK_START_MINS = 9 * 60 + 30;  // 09:30
@@ -469,9 +473,13 @@ exports.exportExcel = async (req, res, next) => {
       const dateStr = d.toLocaleDateString('en-IN');
 
       const toHHMM = (dt) => {
-        if (!dt) return 'N/A';
-        const time = new Date(dt);
-        return `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+        if (!dt) return '—';
+        const time = getKolkataDate(new Date(dt));
+        const hours = time.getHours();
+        const minutes = String(time.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const h12 = hours % 12 || 12;
+        return `${String(h12).padStart(2, '0')}:${minutes} ${ampm}`;
       };
 
       return {
