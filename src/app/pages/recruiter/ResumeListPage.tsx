@@ -78,7 +78,10 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
     ]).then(([compData, recData]: any) => {
       const rawComps = Array.isArray(compData) ? compData : (compData?.companies || []);
       const rawRecs = Array.isArray(recData) ? recData : (recData?.users || recData?.recruiters || []);
-      setCompanies(dedupeCompanies(rawComps));
+      const stringComps = dedupeCompanies(rawComps)
+        .map((c: any) => typeof c === 'string' ? c : (c.companyName || c.name || c.clientName || ''))
+        .filter(Boolean);
+      setCompanies(stringComps);
       setRecruiters(rawRecs);
     }).catch(console.error);
   }, []);
@@ -731,9 +734,14 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700"
               >
                 <option value="All Companies">All Companies</option>
-                {companies.filter(Boolean).map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+                {companies.map((c: any) => {
+                  const cName = typeof c === 'string' ? c : (c.companyName || c.name || c.clientName || '');
+                  const cKey = typeof c === 'string' ? c : (c._id || c.id || cName);
+                  if (!cName) return null;
+                  return (
+                    <option key={cKey} value={cName}>{cName}</option>
+                  );
+                })}
               </select>
             </div>
 
