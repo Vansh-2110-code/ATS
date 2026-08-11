@@ -10,7 +10,15 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { calculateAge } from '../../utils/ageCalculator';
 import { dedupeCompanies } from '../../utils/companyUtils';
-import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS, isTLOnlyStatus } from '../../utils/candidateStatusUtils';
+import {
+  CANDIDATE_STATUS_OPTIONS,
+  CANDIDATE_STATUS_COLORS,
+  RECRUITER_STATUSES,
+  TL_MANAGEMENT_STATUSES,
+  GLOBAL_STATUSES,
+  isTLOnlyStatus,
+  canUserUpdateCandidateStatus,
+} from '../../utils/candidateStatusUtils';
 import { CopyableContact } from '../../components/CopyableContact';
 
 
@@ -25,38 +33,8 @@ const EMAIL_TEMPLATES = [
   { value: 'offer_letter',            label: 'Letter for Initial Job Offer' },
 ];
 
-const STATUS_OPTIONS = [
-  'New', 'Contacted', 'Interested', 'Selected for Call', 'Screening',
-  'Interview Scheduled', 'Selected', 'Rejected',
-  'Eligible Candidates', 'Wrong Number', 'Unreachable',
-  'Did Not Pick', 'Unanswered Calls', 'Call Back',
-  'HR Shortlist', 'Written Test', 'Operations Round',
-  'Document Pending', 'Documentation', 'Yet To Join', 'Joined', 'Exited',
-];
-const STATUS_COLORS: Record<string, string> = {
-  New: 'bg-slate-100 text-slate-600 border-slate-200',
-  Contacted: 'bg-green-100 text-green-700 border-green-200',
-  Interested: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  'Selected for Call': 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  Screening: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  'Interview Scheduled': 'bg-violet-100 text-violet-700 border-violet-200',
-  Selected: 'bg-teal-100 text-teal-700 border-teal-200',
-  Rejected: 'bg-red-100 text-red-600 border-red-200',
-  'Eligible Candidates': 'bg-green-100 text-green-700 border-green-200',
-  'Wrong Number': 'bg-orange-100 text-orange-700 border-orange-200',
-  Unreachable: 'bg-orange-100 text-orange-700 border-orange-200',
-  'Did Not Pick': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Unanswered Calls': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Call Back': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  'HR Shortlist': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  'Written Test': 'bg-blue-100 text-blue-700 border-blue-200',
-  'Operations Round': 'bg-sky-100 text-sky-700 border-sky-200',
-  'Document Pending': 'bg-rose-100 text-rose-700 border-rose-200',
-  Documentation: 'bg-rose-100 text-rose-700 border-rose-200',
-  'Yet To Join': 'bg-purple-100 text-purple-700 border-purple-200',
-  Joined: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  Exited: 'bg-red-100 text-red-700 border-red-200',
-};
+const STATUS_OPTIONS = CANDIDATE_STATUS_OPTIONS;
+const STATUS_COLORS = CANDIDATE_STATUS_COLORS;
 
 const OWNERSHIP_STATUS_COLORS: Record<string, string> = {
   'Assigned': 'bg-green-50 text-green-700 border-green-200',
@@ -314,6 +292,11 @@ export function CandidateProfilePage() {
   const handleStatusUpdate = async (newStatus: string) => {
     if (isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) return;
     
+    if (!canUserUpdateCandidateStatus(newStatus, user?.role)) {
+      alert('Access Restricted: Only Team Leads, Managers, and Admins can assign this status.');
+      return;
+    }
+
     if (newStatus === 'Joined') {
       setShowJoiningModal(true);
       return;
@@ -327,8 +310,9 @@ export function CandidateProfilePage() {
     try {
       await api.updateCandidateStatus(id!, newStatus);
       setStatus(newStatus);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update status:', err);
+      alert(err.response?.data?.message || 'Failed to update status');
     }
   };
 
@@ -1686,25 +1670,93 @@ export function CandidateProfilePage() {
 
           {/* Status Update */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 className="text-slate-700 text-sm mb-2" style={{ fontWeight: 600 }}>Update Status</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-slate-700 text-sm" style={{ fontWeight: 600 }}>Update Status</h3>
+              <span className="text-[11px] text-slate-400 font-medium">32 Official Statuses</span>
+            </div>
             {(isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager) && (
               <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
                 <Lock className="w-3 h-3" /> {isLockedForManager ? 'Read-only access' : isLockedForAll ? 'Locked — Admin only' : isBlockedAsDuplicate ? 'Locked — duplicate profile' : isLockedForTL ? 'TL view only — use Second Call section' : 'Locked after first call'}
               </p>
             )}
-            <div className="space-y-2">
-              {STATUS_OPTIONS.map(s => (
-                <button key={s} onClick={() => handleStatusUpdate(s)}
-                  disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager}
-                  className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    status === s
-                      ? (STATUS_COLORS[s] || 'bg-slate-100 text-slate-600 border-slate-200') + ' border'
-                      : 'border-slate-100 hover:bg-slate-50 text-slate-600'
-                  }`} style={{ fontWeight: status === s ? 600 : 400 }}>
-                  {s}
-                  {status === s && <CheckCircle2 className="w-4 h-4" />}
-                </button>
-              ))}
+
+            <div className="space-y-4 max-h-[520px] overflow-y-auto pr-1">
+              {/* 1. Recruiter & TL Statuses (1 to 17) */}
+              <div>
+                <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
+                  <span>Recruiter & TL Statuses (1–17)</span>
+                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">All Recruiters</span>
+                </div>
+                <div className="space-y-1.5">
+                  {RECRUITER_STATUSES.map(s => (
+                    <button key={s} onClick={() => handleStatusUpdate(s)}
+                      disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager}
+                      className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        status === s
+                          ? (STATUS_COLORS[s] || 'bg-slate-100 text-slate-600 border-slate-200') + ' border font-semibold'
+                          : 'border-slate-100 hover:bg-slate-50 text-slate-600 font-normal'
+                      }`}>
+                      <span>{s}</span>
+                      {status === s && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. TL & Management Statuses (18 to 31) */}
+              <div>
+                <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
+                  <span>TL & Management Statuses (18–31)</span>
+                  <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> TL / Admin Only
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {TL_MANAGEMENT_STATUSES.map(s => {
+                    const isRestricted = !canUserUpdateCandidateStatus(s, user?.role);
+                    return (
+                      <button key={s} onClick={() => handleStatusUpdate(s)}
+                        disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager}
+                        title={isRestricted ? 'Restricted: Only Team Leads, Managers, and Admins can assign this status' : ''}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                          status === s
+                            ? (STATUS_COLORS[s] || 'bg-indigo-100 text-indigo-700 border-indigo-200') + ' border font-semibold'
+                            : isRestricted
+                            ? 'border-slate-100 bg-slate-50/50 text-slate-400 hover:border-slate-200 cursor-not-allowed font-normal'
+                            : 'border-slate-100 hover:bg-slate-50 text-slate-700 font-normal'
+                        }`}>
+                        <span className="flex items-center gap-1.5">
+                          {s}
+                          {isRestricted && <Lock className="w-2.5 h-2.5 text-slate-400" />}
+                        </span>
+                        {status === s && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Global Status (32: Black List) */}
+              <div>
+                <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center justify-between">
+                  <span>Global Status (32)</span>
+                  <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">All Roles</span>
+                </div>
+                <div className="space-y-1.5">
+                  {GLOBAL_STATUSES.map(s => (
+                    <button key={s} onClick={() => handleStatusUpdate(s)}
+                      disabled={isLockedForRecruiter || isLockedForAll || isLockedForTL || isBlockedAsDuplicate || isLockedForManager}
+                      className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        status === s
+                          ? (STATUS_COLORS[s] || 'bg-stone-800 text-white border-stone-900') + ' border font-semibold'
+                          : 'border-slate-100 hover:bg-slate-50 text-slate-600 font-normal'
+                      }`}>
+                      <span>{s}</span>
+                      {status === s && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

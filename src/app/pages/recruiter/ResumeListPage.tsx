@@ -15,33 +15,14 @@ import { CopyableContact } from '../../components/CopyableContact';
 
 const API_BASE = window.location.origin;
 
-// ── Extended status list ──────────────────────────────────────
-const STATUS_COLORS: Record<string, string> = {
-  New:                  'bg-slate-100 text-slate-600',
-  Screening:            'bg-sky-100 text-sky-700',
-  Contacted:            'bg-green-100 text-green-700',
-  Interested:           'bg-emerald-100 text-emerald-700',
-  'Interview Scheduled':'bg-violet-100 text-violet-700',
-  Selected:             'bg-teal-100 text-teal-700',
-  Rejected:             'bg-red-100 text-red-600',
-  'Eligible Candidates':'bg-emerald-100 text-emerald-700',
-  'Wrong Number':       'bg-red-100 text-red-600',
-  'Did Not Pick':       'bg-orange-100 text-orange-700',
-  'Call Back':          'bg-amber-100 text-amber-700',
-  'HR Shortlist':       'bg-violet-100 text-violet-700',
-  'Written Test':       'bg-indigo-100 text-indigo-700',
-  'Operations Round':   'bg-cyan-100 text-cyan-700',
-  Documentation:        'bg-sky-100 text-sky-700',
-  'Yet To Join':        'bg-pink-100 text-pink-700',
-  Joined:               'bg-green-100 text-green-700',
-};
+const STATUS_COLORS = CANDIDATE_STATUS_COLORS;
 
 // ── Extended source list ──────────────────────────────────────
 const SOURCES = [
   'All Sources', 'Naukri', 'LinkedIn', 'Indeed', 'Referral',
   'Walk-In', 'Shine', 'Facebook', 'Social Media', 'Excel Import'
 ];
-const STATUSES = ['All Status', ...Object.keys(STATUS_COLORS)];
+const STATUSES = ['All Status', ...CANDIDATE_STATUS_OPTIONS];
 
 // ── Location data ─────────────────────────────────────────────
 const CITIES = ['', 'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata', 'Ahmedabad'];

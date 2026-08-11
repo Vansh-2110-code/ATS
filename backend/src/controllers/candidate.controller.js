@@ -852,6 +852,17 @@ exports.updateStatus = async (req, res, next) => {
       return res.status(403).json({ message: 'Candidate status is "Joined" and cannot be changed back to any other status.' });
     }
 
+    // Role-based Status Restriction: Statuses 18 to 31 are restricted to TL, Manager, and Admin only
+    const TL_MANAGEMENT_STATUSES = [
+      'L1 Select', 'L1 Reject', 'L2 Select', 'L2 Reject',
+      'Final Select', 'Final Reject', 'Document Initialized', 'Documennt Initialted',
+      'Documentation Completed', 'Documentation Incomplete', 'Waiting for Offer',
+      'Offer Accept', 'Offer Reject', 'Joined', 'Joined and Abort'
+    ];
+    if (TL_MANAGEMENT_STATUSES.includes(status) && req.user.role === 'recruiter') {
+      return res.status(403).json({ message: 'Access Denied: Only Team Leads, Managers, and Admins can assign this status.' });
+    }
+
     if (candidate.isDuplicate && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'This candidate is flagged as a duplicate. Contact Admin.' });
     }

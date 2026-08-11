@@ -10,6 +10,12 @@ import { useAuth } from '../../context/AuthContext';
 import { calculateAge } from '../../utils/ageCalculator';
 import { ExtractionPreviewModal } from '../../components/ExtractionPreviewModal';
 import { DepartmentDropdown } from '../../components/DepartmentDropdown';
+import {
+  RECRUITER_STATUSES,
+  TL_MANAGEMENT_STATUSES,
+  GLOBAL_STATUSES,
+  CANDIDATE_STATUS_OPTIONS,
+} from '../../utils/candidateStatusUtils';
 
 const API_BASE = window.location.origin;
 
@@ -1751,10 +1757,33 @@ export function AddCandidatePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-700 mb-1.5" style={{ fontWeight: 500 }}>Recruiter Status</label>
-                  <input type="text" value={form.recruiterStatus} onChange={e => set('recruiterStatus', e.target.value)}
-                    placeholder="Status / Note"
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-green-400" />
+                  <label className="block text-sm text-slate-700 mb-1.5" style={{ fontWeight: 500 }}>
+                    Candidate Status
+                  </label>
+                  <select
+                    value={form.recruiterStatus}
+                    onChange={e => set('recruiterStatus', e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-green-400 bg-white"
+                  >
+                    <option value="">— Select Status (Default: Eligible) —</option>
+                    <optgroup label="Recruiter & TL Statuses (1–17)">
+                      {RECRUITER_STATUSES.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </optgroup>
+                    {['admin', 'tl', 'manager'].includes(user?.role || '') && (
+                      <optgroup label="TL & Management Statuses (18–31)">
+                        {TL_MANAGEMENT_STATUSES.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="Global Status (32)">
+                      {GLOBAL_STATUSES.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </optgroup>
+                  </select>
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">

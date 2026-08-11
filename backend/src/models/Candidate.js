@@ -1,24 +1,30 @@
 const mongoose = require('mongoose');
 
 const CANDIDATE_STATUSES = [
+  // 1 to 17: Recruiter & TL
+  'Eligible', 'Not Eligible', 'No Response', 'Duplicate-Client', 'Call Back',
+  'Hold', 'Submitted to Client', 'Sublitted To Client', 'Submitted To Client', 'Walkin Company', 'Walkin WHM',
+  'No Show', 'VNA Select', 'VNA Reject', 'Test Select', 'Test Reject',
+  'Candidate Drop Post L1 Select', 'Candidate Drop Post L2 Select',
+  'Candidate Drop During Final Stage',
+
+  // 18 to 31: TL & Management
+  'L1 Select', 'L1 Reject', 'L2 Select', 'L2 Reject',
+  'Final Select', 'Final Reject', 'Document Initialized',
+  'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete',
+  'Waiting for Offer', 'Offer Accept', 'Offer Reject', 'Joined',
+  'Joined and Abort',
+
+  // 32: All
+  'Black List',
+
+  // Legacy Aliases
   'New', 'Contacted', 'Interested', 'Selected for Call', 'Screening',
   'Interview Scheduled', 'Selected', 'Rejected',
   'Eligible Candidates', 'Wrong Number', 'Unreachable',
-  'Did Not Pick', 'Unanswered Calls', 'Call Back',
-  'HR Shortlist', 'Written Test', 'Operations Round',
-  'Document Pending', 'Documentation', 'Yet To Join', 'Joined',
-  'Walk-in Submitted', 'Exited',
-
-  // Aliases and sub-statuses
-  'Eligible', 'Not Eligible', 'Not Interested', 'No Response', 'Duplicate-Client',
-  'Hold', 'Submitted to Client', 'Submitted To Client', 'Walkin Company', 'Walkin WHM',
-  'No Show', 'VNA Select', 'VNA Reject', 'Test Select', 'Test Reject',
-  'Candidate Drop Post L1 Select', 'Candidate Drop Post L2 Select',
-  'Candidate Drop During Final Stage', 'L1 Select', 'L1 Reject', 'L2 Select',
-  'L2 Reject', 'Final Select', 'Final Reject', 'Document Initialized',
-  'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete',
-  'Waiting for Offer', 'Offer Accept', 'Offer Reject',
-  'Joined and Abort', 'Black List'
+  'Did Not Pick', 'Unanswered Calls', 'HR Shortlist', 'Written Test',
+  'Operations Round', 'Document Pending', 'Documentation', 'Yet To Join',
+  'Walk-in Submitted', 'Exited', 'Not Interested'
 ];
 
 

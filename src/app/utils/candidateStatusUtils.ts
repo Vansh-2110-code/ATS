@@ -1,68 +1,70 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OFFICIAL 32 CANDIDATE STATUSES & ROLE RESTRICTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Statuses 1 to 17: Accessible to Recruiter, Team Lead, Manager, Admin
 export const RECRUITER_STATUSES = [
-  'New',
-  'Screening',
-  'Contacted',
-  'Interested',
-  'Selected for Call',
-  'Interview Scheduled',
-  'Eligible Candidates',
-  'Wrong Number',
-  'Unreachable',
-  'Did Not Pick',
-  'Unanswered Calls',
+  'Eligible',
+  'Not Eligible',
+  'No Response',
+  'Duplicate-Client',
   'Call Back',
-  'HR Shortlist',
-  'Written Test',
-  'Operations Round',
-  'Document Pending',
-  'Documentation',
-  'Walk-in Submitted',
+  'Hold',
+  'Submitted to Client',
+  'Walkin Company',
+  'Walkin WHM',
+  'No Show',
+  'VNA Select',
+  'VNA Reject',
+  'Test Select',
+  'Test Reject',
+  'Candidate Drop Post L1 Select',
+  'Candidate Drop Post L2 Select',
+  'Candidate Drop During Final Stage',
 ] as const;
 
+// Statuses 18 to 31: Restricted to Team Lead, Manager, Admin only
 export const TL_MANAGEMENT_STATUSES = [
-  'Selected',
-  'Yet To Join',
+  'L1 Select',
+  'L1 Reject',
+  'L2 Select',
+  'L2 Reject',
+  'Final Select',
+  'Final Reject',
+  'Document Initialized',
+  'Documentation Completed',
+  'Documentation Incomplete',
+  'Waiting for Offer',
+  'Offer Accept',
+  'Offer Reject',
   'Joined',
-  'Rejected',
-  'Exited',
+  'Joined and Abort',
 ] as const;
 
+// Status 32: Accessible to All roles
 export const GLOBAL_STATUSES = [
   'Black List',
 ] as const;
 
+// Complete 32 Official Statuses in exact order from the specification
 export const CANDIDATE_STATUS_OPTIONS = [
-  'New',
-  'Screening',
-  'Contacted',
-  'Interested',
-  'Selected for Call',
-  'Interview Scheduled',
-  'Selected',
-  'Rejected',
-  'Eligible Candidates',
-  'Wrong Number',
-  'Unreachable',
-  'Did Not Pick',
-  'Unanswered Calls',
-  'Call Back',
-  'HR Shortlist',
-  'Written Test',
-  'Operations Round',
-  'Document Pending',
-  'Documentation',
-  'Yet To Join',
-  'Joined',
-  'Walk-in Submitted',
-  'Exited',
+  ...RECRUITER_STATUSES,
+  ...TL_MANAGEMENT_STATUSES,
+  ...GLOBAL_STATUSES,
 ] as const;
 
 export type CandidateStatus = typeof CANDIDATE_STATUS_OPTIONS[number];
 
+/**
+ * Returns true if the status is restricted to TL / Manager / Admin only.
+ */
 export function isTLOnlyStatus(status: string): boolean {
   return (TL_MANAGEMENT_STATUSES as readonly string[]).includes(status);
 }
 
+/**
+ * Validates if the user's role allows setting/updating candidate to the given status.
+ */
 export function canUserUpdateCandidateStatus(status: string, role?: string): boolean {
   if (!role) return false;
   const isTLOrAbove = ['admin', 'tl', 'manager'].includes(role);
@@ -72,7 +74,60 @@ export function canUserUpdateCandidateStatus(status: string, role?: string): boo
   return true;
 }
 
+/**
+ * Returns list of accessible statuses for the user's role.
+ */
+export function getAccessibleStatusesForRole(role?: string): string[] {
+  if (!role) return [...RECRUITER_STATUSES, ...GLOBAL_STATUSES];
+  if (['admin', 'tl', 'manager'].includes(role)) {
+    return [...CANDIDATE_STATUS_OPTIONS];
+  }
+  return [...RECRUITER_STATUSES, ...GLOBAL_STATUSES];
+}
+
 export const CANDIDATE_STATUS_COLORS: Record<string, string> = {
+  // 1-17: Recruiter & TL Statuses
+  Eligible: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'Not Eligible': 'bg-red-100 text-red-700 border-red-200',
+  'No Response': 'bg-slate-100 text-slate-600 border-slate-200',
+  'Duplicate-Client': 'bg-orange-100 text-orange-700 border-orange-200',
+  'Call Back': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  Hold: 'bg-amber-100 text-amber-700 border-amber-200',
+  'Submitted to Client': 'bg-blue-100 text-blue-700 border-blue-200',
+  'Sublitted To Client': 'bg-blue-100 text-blue-700 border-blue-200',
+  'Submitted To Client': 'bg-blue-100 text-blue-700 border-blue-200',
+  'Walkin Company': 'bg-sky-100 text-sky-700 border-sky-200',
+  'Walkin WHM': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  'No Show': 'bg-rose-100 text-rose-700 border-rose-200',
+  'VNA Select': 'bg-teal-100 text-teal-700 border-teal-200',
+  'VNA Reject': 'bg-pink-100 text-pink-700 border-pink-200',
+  'Test Select': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  'Test Reject': 'bg-rose-100 text-rose-700 border-rose-200',
+  'Candidate Drop Post L1 Select': 'bg-amber-100 text-amber-800 border-amber-200',
+  'Candidate Drop Post L2 Select': 'bg-orange-100 text-orange-800 border-orange-200',
+  'Candidate Drop During Final Stage': 'bg-red-100 text-red-800 border-red-200',
+
+  // 18-31: TL & Management Statuses
+  'L1 Select': 'bg-emerald-100 text-emerald-800 border-emerald-300 font-medium',
+  'L1 Reject': 'bg-red-100 text-red-800 border-red-300 font-medium',
+  'L2 Select': 'bg-teal-100 text-teal-800 border-teal-300 font-medium',
+  'L2 Reject': 'bg-rose-100 text-rose-800 border-rose-300 font-medium',
+  'Final Select': 'bg-green-100 text-green-800 border-green-300 font-medium',
+  'Final Reject': 'bg-red-100 text-red-800 border-red-300 font-medium',
+  'Document Initialized': 'bg-purple-100 text-purple-800 border-purple-300 font-medium',
+  'Documennt Initialted': 'bg-purple-100 text-purple-800 border-purple-300 font-medium',
+  'Documentation Completed': 'bg-indigo-100 text-indigo-800 border-indigo-300 font-medium',
+  'Documentation Incomplete': 'bg-amber-100 text-amber-800 border-amber-300 font-medium',
+  'Waiting for Offer': 'bg-blue-100 text-blue-800 border-blue-300 font-medium',
+  'Offer Accept': 'bg-emerald-100 text-emerald-800 border-emerald-300 font-medium',
+  'Offer Reject': 'bg-orange-100 text-orange-800 border-orange-300 font-medium',
+  Joined: 'bg-emerald-200 text-emerald-900 border-emerald-400 font-semibold',
+  'Joined and Abort': 'bg-rose-200 text-rose-900 border-rose-400 font-semibold',
+
+  // 32: Global Status
+  'Black List': 'bg-stone-800 text-white border-stone-900 font-semibold',
+
+  // Backward compatibility legacy aliases
   New: 'bg-slate-100 text-slate-600 border-slate-200',
   Screening: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   Contacted: 'bg-green-100 text-green-700 border-green-200',
@@ -86,43 +141,11 @@ export const CANDIDATE_STATUS_COLORS: Record<string, string> = {
   Unreachable: 'bg-orange-100 text-orange-700 border-orange-200',
   'Did Not Pick': 'bg-amber-100 text-amber-700 border-amber-200',
   'Unanswered Calls': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Call Back': 'bg-yellow-100 text-yellow-700 border-yellow-200',
   'HR Shortlist': 'bg-purple-100 text-purple-700 border-purple-200',
   'Written Test': 'bg-blue-100 text-blue-700 border-blue-200',
   'Operations Round': 'bg-sky-100 text-sky-700 border-sky-200',
   'Document Pending': 'bg-rose-100 text-rose-700 border-rose-200',
   Documentation: 'bg-sky-100 text-sky-700 border-sky-200',
   'Yet To Join': 'bg-purple-100 text-purple-700 border-purple-200',
-  Joined: 'bg-green-100 text-green-700 border-green-200',
-  'Walk-in Submitted': 'bg-teal-100 text-teal-700 border-teal-200',
   Exited: 'bg-red-100 text-red-700 border-red-200',
-
-  // Additional aliases
-  Eligible: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  'Not Eligible': 'bg-red-100 text-red-700 border-red-200',
-  'Not Interested': 'bg-rose-100 text-rose-700 border-rose-200',
-  'No Response': 'bg-slate-100 text-slate-600 border-slate-200',
-  'Duplicate-Client': 'bg-orange-100 text-orange-700 border-orange-200',
-  Hold: 'bg-amber-100 text-amber-700 border-amber-200',
-  'Submitted to Client': 'bg-blue-100 text-blue-700 border-blue-200',
-  'Walkin Company': 'bg-sky-100 text-sky-700 border-sky-200',
-  'Walkin WHM': 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  'No Show': 'bg-rose-100 text-rose-700 border-rose-200',
-  'VNA Select': 'bg-teal-100 text-teal-700 border-teal-200',
-  'VNA Reject': 'bg-pink-100 text-pink-700 border-pink-200',
-  'Test Select': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  'Test Reject': 'bg-rose-100 text-rose-700 border-rose-200',
-  'L1 Select': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'L1 Reject': 'bg-red-100 text-red-800 border-red-300',
-  'L2 Select': 'bg-teal-100 text-teal-800 border-teal-300',
-  'L2 Reject': 'bg-rose-100 text-rose-800 border-rose-300',
-  'Final Select': 'bg-green-100 text-green-800 border-green-300',
-  'Final Reject': 'bg-red-100 text-red-800 border-red-300',
-  'Document Initialized': 'bg-purple-100 text-purple-800 border-purple-300',
-  'Documentation Completed': 'bg-indigo-100 text-indigo-800 border-indigo-300',
-  'Documentation Incomplete': 'bg-amber-100 text-amber-800 border-amber-300',
-  'Waiting for Offer': 'bg-blue-100 text-blue-800 border-blue-300',
-  'Offer Accept': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'Offer Reject': 'bg-orange-100 text-orange-800 border-orange-300',
-  'Black List': 'bg-stone-800 text-white border-stone-900',
 };
