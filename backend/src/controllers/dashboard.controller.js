@@ -251,9 +251,9 @@ exports.tlDashboard = async (req, res, next) => {
       };
 
       const eligible = await Candidate.countDocuments(candMatch({ status: { $in: ['Eligible', 'Eligible Candidates'] } }));
-      const finalSelect = await Candidate.countDocuments(candMatch({ status: { $in: ['Final Select', 'Final Round Scheduled', 'Final Round Completed', 'L1 Select', 'Client Select', 'Selected'] } }));
-      const docCompleted = await Candidate.countDocuments(candMatch({ status: { $in: ['Documentation Completed', 'Documentation Incomplete', 'Document Initialized', 'Documennt Initialted', 'Documentation'] } }));
-      const offerAccept = await Candidate.countDocuments(candMatch({ status: { $in: ['Offer Accept', 'Offer Accepted', 'Offered', 'Offer Released'] } }));
+      const finalSelect = await Candidate.countDocuments(candMatch({ status: { $in: ['Final Select', 'Final Round Scheduled', 'Final Round Completed', 'L1 Select', 'L2 Select', 'Test Select', 'VNA Select', 'Client Select', 'Selected'] } }));
+      const docCompleted = await Candidate.countDocuments(candMatch({ status: { $in: ['Documentation Completed', 'Documentation Incomplete', 'Document Initialized', 'Documennt Initialted', 'Documentation', 'Document Pending'] } }));
+      const offerAccept = await Candidate.countDocuments(candMatch({ status: { $in: ['Offer Accept', 'Offer Accepted', 'Offered', 'Offer Released', 'Waiting for Offer'] } }));
       const joined = await Candidate.countDocuments(candMatch({ status: 'Joined' }));
 
       const todayCallsAgg = await Candidate.aggregate([
@@ -286,12 +286,12 @@ exports.tlDashboard = async (req, res, next) => {
       const activeCandidates = await Candidate.countDocuments({
         assignedRecruiter: r._id,
         ...extraFilter,
-        status: { $nin: ['Rejected', 'Joined'] },
+        status: { $nin: ['Rejected', 'Joined', 'Black List', 'Exited', 'Joined and Abort'] },
       });
 
       const totalInterviewsScheduled = await Candidate.countDocuments({
         assignedRecruiter: r._id,
-        status: { $in: ['Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Shortlisted', 'HR Round Scheduled', 'Final Round Scheduled', 'Selected', 'Rejected'] }
+        status: { $in: ['Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Shortlisted', 'HR Round Scheduled', 'Final Round Scheduled', 'Selected', 'Rejected', 'Test Select', 'VNA Select', 'L1 Select', 'L2 Select', 'Final Select'] }
       });
 
       return {
@@ -301,6 +301,11 @@ exports.tlDashboard = async (req, res, next) => {
         employeeId: r.employeeId,
         todayCalls,
         totalCalls,
+        eligible,
+        finalSelect,
+        docCompleted,
+        offerAccept,
+        joined,
         callTarget: 50,
         todayInterviews,
         totalInterviewsScheduled,
@@ -313,12 +318,12 @@ exports.tlDashboard = async (req, res, next) => {
 
     // Team Summary Totals
     const summary = {
-      totalCalls: teamStats.reduce((s, r) => s + r.totalCalls, 0),
-      eligible: teamStats.reduce((s, r) => s + r.eligible, 0),
-      finalSelect: teamStats.reduce((s, r) => s + r.finalSelect, 0),
-      docCompleted: teamStats.reduce((s, r) => s + r.docCompleted, 0),
-      offerAccept: teamStats.reduce((s, r) => s + r.offerAccept, 0),
-      joined: teamStats.reduce((s, r) => s + r.joined, 0),
+      totalCalls: teamStats.reduce((s, r) => s + (r.totalCalls || 0), 0),
+      eligible: teamStats.reduce((s, r) => s + (r.eligible || 0), 0),
+      finalSelect: teamStats.reduce((s, r) => s + (r.finalSelect || 0), 0),
+      docCompleted: teamStats.reduce((s, r) => s + (r.docCompleted || 0), 0),
+      offerAccept: teamStats.reduce((s, r) => s + (r.offerAccept || 0), 0),
+      joined: teamStats.reduce((s, r) => s + (r.joined || 0), 0),
     };
 
     if ((currentUser.role === 'admin' || currentUser.role === 'manager') && !tlId && (!recruiter || recruiter === 'All Recruiters' || recruiter === 'All')) {
@@ -327,9 +332,9 @@ exports.tlDashboard = async (req, res, next) => {
         ...(selectedRange !== 'all' ? { createdAt: dateFilter } : {})
       };
       summary.eligible = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Eligible', 'Eligible Candidates'] } });
-      summary.finalSelect = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Final Select', 'Final Round Scheduled', 'Final Round Completed', 'L1 Select', 'Client Select', 'Selected'] } });
-      summary.docCompleted = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Documentation Completed', 'Documentation Incomplete', 'Document Initialized', 'Documennt Initialted', 'Documentation'] } });
-      summary.offerAccept = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Offer Accept', 'Offer Accepted', 'Offered', 'Offer Released'] } });
+      summary.finalSelect = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Final Select', 'Final Round Scheduled', 'Final Round Completed', 'L1 Select', 'L2 Select', 'Test Select', 'VNA Select', 'Client Select', 'Selected'] } });
+      summary.docCompleted = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Documentation Completed', 'Documentation Incomplete', 'Document Initialized', 'Documennt Initialted', 'Documentation', 'Document Pending'] } });
+      summary.offerAccept = await Candidate.countDocuments({ ...summaryMatch, status: { $in: ['Offer Accept', 'Offer Accepted', 'Offered', 'Offer Released', 'Waiting for Offer'] } });
       summary.joined = await Candidate.countDocuments({ ...summaryMatch, status: 'Joined' });
     }
 

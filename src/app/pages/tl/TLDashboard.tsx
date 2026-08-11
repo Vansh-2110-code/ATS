@@ -216,12 +216,12 @@ export function TLDashboard() {
   };
 
   // Metric aggregates for TL Overview
-  const totalCallsDone = summary.totalCalls || team.reduce((s, r) => s + r.totalCalls, 0);
-  const totalEligible = summary.eligible || team.reduce((s, r) => s + r.eligible, 0);
-  const totalFinalSelect = summary.finalSelect || team.reduce((s, r) => s + r.finalSelect, 0);
-  const totalDocCompleted = summary.docCompleted || team.reduce((s, r) => s + r.docCompleted, 0);
-  const totalOfferAccept = summary.offerAccept || team.reduce((s, r) => s + r.offerAccept, 0);
-  const totalJoined = summary.joined || team.reduce((s, r) => s + r.joined, 0);
+  const totalCallsDone = summary.totalCalls || team.reduce((s, r) => s + (r.totalCalls || r.calls || 0), 0);
+  const totalEligible = summary.eligible || team.reduce((s, r) => s + (r.eligible || 0), 0) || (dashData?.pipeline?.['Eligible'] || 0);
+  const totalFinalSelect = summary.finalSelect || team.reduce((s, r) => s + (r.finalSelect || 0), 0) || ((dashData?.pipeline?.['Final Select'] || 0) + (dashData?.pipeline?.['L1 Select'] || 0) + (dashData?.pipeline?.['L2 Select'] || 0) + (dashData?.pipeline?.['Test Select'] || 0));
+  const totalDocCompleted = summary.docCompleted || team.reduce((s, r) => s + (r.docCompleted || 0), 0) || ((dashData?.pipeline?.['Documentation Completed'] || 0) + (dashData?.pipeline?.['Document Initialized'] || 0));
+  const totalOfferAccept = summary.offerAccept || team.reduce((s, r) => s + (r.offerAccept || 0), 0) || ((dashData?.pipeline?.['Offer Accept'] || 0) + (dashData?.pipeline?.['Waiting for Offer'] || 0));
+  const totalJoined = summary.joined || team.reduce((s, r) => s + (r.joined || 0), 0) || (dashData?.pipeline?.['Joined'] || 0);
 
   const STATUS_CARDS = CANDIDATE_STATUS_OPTIONS.map((label, i) => ({
     label,
