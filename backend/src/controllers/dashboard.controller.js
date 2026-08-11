@@ -23,14 +23,8 @@ exports.recruiterDashboard = async (req, res, next) => {
     let recruiterIdsFilter = null;
 
     if (isAdmin) {
-<<<<<<< HEAD
-      if (recruiter) {
-        // If admin/manager/tl wants a specific recruiter
-        filterRecruiter = new mongoose.Types.ObjectId(recruiter);
-=======
       if (recruiter && recruiter !== 'All Recruiters' && recruiter !== 'All') {
         filterRecruiter = mongoose.Types.ObjectId.isValid(recruiter) ? new mongoose.Types.ObjectId(recruiter) : recruiter;
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
       } else {
         filterRecruiter = null; // Admin viewing all
       }
@@ -70,9 +64,6 @@ exports.recruiterDashboard = async (req, res, next) => {
 
     const pipeline = {};
     Candidate.STATUSES.forEach(s => { pipeline[s] = 0; });
-<<<<<<< HEAD
-    statusCounts.forEach(s => { pipeline[s._id] = s.count; });
-=======
     statusCounts.forEach(s => { if (s._id) pipeline[s._id] = s.count; });
     pipeline['Eligible'] = (pipeline['Eligible'] || 0) + (pipeline['Eligible Candidates'] || 0);
 
@@ -124,7 +115,6 @@ exports.recruiterDashboard = async (req, res, next) => {
       ...candDateFilter,
       status: 'Joined'
     });
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 
     // Call stats
     const callMatch = { createdAt: dateFilter };
@@ -190,11 +180,7 @@ exports.recruiterDashboard = async (req, res, next) => {
 // GET /api/dashboard/tl
 exports.tlDashboard = async (req, res, next) => {
   try {
-<<<<<<< HEAD
-    const { tlId } = req.query;
-=======
     const { range = 'month', startDate, endDate, tlId, division, company, customer, recruiter } = req.query;
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     const currentUser = req.user;
 
     // Determine target TL ID: Admins can specify, TLs get their own
@@ -209,8 +195,6 @@ exports.tlDashboard = async (req, res, next) => {
       .map(ta => ta.memberId)
       .filter(u => u && u.status === 'Active');
 
-<<<<<<< HEAD
-=======
     if (recruiters.length === 0 && (currentUser.role === 'admin' || currentUser.role === 'manager') && !tlId) {
       recruiters = await User.find({ role: { $in: ['recruiter', 'tl'] }, status: { $ne: 'Suspended' } }).select('name email employeeId status').lean();
     } else {
@@ -224,7 +208,6 @@ exports.tlDashboard = async (req, res, next) => {
       recruiters = recruiters.filter(r => String(r._id) === String(recruiter) || r.name === recruiter);
     }
 
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     const recruiterIds = recruiters.map(r => r._id);
 
     const today = new Date();
@@ -245,15 +228,9 @@ exports.tlDashboard = async (req, res, next) => {
     }
 
     const teamStats = await Promise.all(recruiters.map(async (r) => {
-<<<<<<< HEAD
-      // Count notes added today as "calls made" (each note = a recruiter interaction)
-=======
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
       const callsAgg = await Candidate.aggregate([
         { $match: { assignedRecruiter: r._id, ...extraFilter } },
         { $unwind: '$notes' },
-<<<<<<< HEAD
-=======
         ...(selectedRange !== 'all' ? [{ $match: { 'notes.createdAt': dateFilter } }] : []),
         { $count: 'count' },
       ]);
@@ -277,7 +254,6 @@ exports.tlDashboard = async (req, res, next) => {
       const todayCallsAgg = await Candidate.aggregate([
         { $match: { assignedRecruiter: r._id } },
         { $unwind: '$notes' },
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
         { $match: { 'notes.createdAt': { $gte: today, $lt: tomorrow } } },
         { $count: 'count' },
       ]);
@@ -337,8 +313,6 @@ exports.tlDashboard = async (req, res, next) => {
       };
     }));
 
-<<<<<<< HEAD
-=======
     // Team Summary Totals
     const summary = {
       totalCalls: teamStats.reduce((s, r) => s + r.totalCalls, 0),
@@ -361,7 +335,6 @@ exports.tlDashboard = async (req, res, next) => {
       summary.joined = await Candidate.countDocuments({ ...summaryMatch, status: 'Joined' });
     }
 
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     // Pending corrections (filtered by team members)
     const corrections = await Candidate.find({ 
       flagged: true,
@@ -582,10 +555,7 @@ exports.adminDashboard = async (req, res, next) => {
         hrRoundCount,
         followToJoinCount,
         joinedCount,
-<<<<<<< HEAD
-=======
         joined: joinedCount,
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
         rejectedCount,
         openJobsCount,
         currentMonthRevenue,
@@ -767,12 +737,6 @@ exports.divisionDashboard = async (req, res, next) => {
     const joinedCount = await Candidate.countDocuments({ division, status: 'Joined' });
     const yetToJoinCount = await Candidate.countDocuments({ division, status: 'Yet To Join' });
 
-<<<<<<< HEAD
-    // 3. Joined Candidates with Date of Joining
-    const joinedCandidates = await Candidate.find({ division, status: 'Joined' })
-      .select('name positionApplied clientName dateOfJoining assignedRecruiterName')
-      .sort('-dateOfJoining');
-=======
     const interviewStatuses = [
       'Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Interview',
       'Selected for Interview', 'Written Test', 'Operations Round', 'Interview Feedback Pending',
@@ -852,7 +816,6 @@ exports.divisionDashboard = async (req, res, next) => {
         .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status candidateStatusPostOffer')
         .sort('-createdAt')
     ]);
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 
     res.json({
       division,
@@ -1027,8 +990,6 @@ exports.advancedReports = async (req, res, next) => {
       };
     });
 
-<<<<<<< HEAD
-=======
     // 6. Active JR Report (JR Nos, Customer Name, Skills, Active profiles in Pipeline)
     const openJobs = await Job.find({ status: { $ne: 'Closed' } })
       .populate('createdBy', 'name email employeeId role')
@@ -1283,7 +1244,6 @@ exports.advancedReports = async (req, res, next) => {
     const unassignedMetrics = (await Promise.all(unassignedRecruiters.map(m => getMetricsForUser(m))))
       .sort((a, b) => b.joinees - a.joinees || b.selects - a.selects || b.submitted - a.submitted);
 
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     res.json({
       recruiterReport,
       customerReport,
@@ -1292,9 +1252,6 @@ exports.advancedReports = async (req, res, next) => {
         avgStageAging,
         candidates: agingCandidates.slice(0, 100) // limit to top 100 for performance
       },
-<<<<<<< HEAD
-      conversionReport
-=======
       conversionReport,
       activeJRsReport,
       activeProfilesReport,
@@ -1304,7 +1261,6 @@ exports.advancedReports = async (req, res, next) => {
         teams: teamWiseReport,
         unassignedMembers: unassignedMetrics
       }
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
     });
   } catch (err) {
     next(err);

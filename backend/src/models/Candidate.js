@@ -1,15 +1,6 @@
 const mongoose = require('mongoose');
 
 const CANDIDATE_STATUSES = [
-<<<<<<< HEAD
-  'New', 'Contacted', 'Interested', 'Selected for Call', 'Screening',
-  'Interview Scheduled', 'Selected', 'Rejected',
-  'Eligible Candidates', 'Wrong Number', 'Unreachable',
-  'Did Not Pick', 'Unanswered Calls', 'Call Back',
-  'HR Shortlist', 'Written Test', 'Operations Round',
-  'Document Pending', 'Documentation', 'Yet To Join', 'Joined',
-  'Walk-in Submitted', 'Exited'
-=======
   // Official Statuses
   'Eligible', 'Not Eligible', 'Not Interested', 'No Response', 'Duplicate-Client', 'Call Back',
   'Hold', 'Submitted To Client', 'Submitted to Client', 'Sublitted To Client', 'Walkin Company', 'Walkin WHM',
@@ -27,8 +18,8 @@ const CANDIDATE_STATUSES = [
   'Wrong Number', 'Unreachable', 'Did Not Pick', 'Unanswered Calls',
   'HR Shortlist', 'Written Test', 'Operations Round', 'Document Pending',
   'Documentation', 'Yet To Join', 'Walk-in Submitted', 'Exited', 'New'
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
 ];
+
 
 const SOURCES = [
   'Naukri', 'LinkedIn', 'Indeed', 'Walk-In', 'Referral',

@@ -620,55 +620,6 @@ export function AdminDashboard() {
       {/* ══════════════ TAB: OVERVIEW ══════════════ */}
       {activeTab === 'overview' && (
         <>
-<<<<<<< HEAD
-          {/* System Metrics */}
-          {/* System & Recruitment Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-            {[
-              { label: 'Active Logins Today', value: adminMetrics.activeLogins ?? '—', sub: 'System Users',  icon: Monitor,        color: 'blue',    href: '/admin/attendance' },
-              { label: 'Attendance Rate',     value: adminMetrics.attendanceRate ? `${adminMetrics.attendanceRate}%` : '—', sub: 'System Users', icon: Clock, color: 'emerald', href: '/admin/attendance' },
-              { label: 'Pending Alerts',      value: alerts.length || '0', sub: `${alerts.filter((a: any) => a.type === 'error').length} critical`, icon: AlertTriangle, color: 'amber', href: '/admin/logs' },
-              { label: 'Total Candidate Revenue', value: fmt(totalCandidateRevenue), sub: 'From Placements', icon: DollarSign, color: 'emerald', href: 'tab:analytics' },
-              { label: 'Revenue (This Month)',value: adminMetrics.currentMonthRevenue ? fmt(adminMetrics.currentMonthRevenue) : '₹0', sub: 'Business', icon: DollarSign, color: 'emerald', href: '/revenue' },
-              { label: 'Total Candidates',    value: adminMetrics.totalCandidates ?? '—', sub: 'Resume DB', icon: Users, color: 'violet', href: '/recruiter/resumes' },
-              { label: 'Pending Follow-ups',  value: adminMetrics.pendingFollowUps ?? '0', sub: 'Action Required', icon: AlertCircle, color: 'amber', href: '/tl/follow-ups' },
-              { label: 'HR Round',            value: adminMetrics.hrRoundCount ?? '0', sub: 'In Progress', icon: ClipboardList, color: 'blue', href: '/admin/candidates?statusFilter=HR%20Shortlist' },
-              { label: 'Follow to Join',      value: adminMetrics.followToJoinCount ?? '0', sub: 'Pipeline', icon: UserCheck, color: 'violet', href: '/admin/candidates?statusFilter=Yet%20To%20Join' },
-              { label: 'Joined Candidates',   value: adminMetrics.joinedCount ?? '0', sub: 'Successfully Placed', icon: CheckCircle2, color: 'emerald', href: '/admin/candidates?statusFilter=Joined' },
-              { label: 'Rejected Candidates', value: adminMetrics.rejectedCount ?? '0', sub: 'Closed/Dropped', icon: X, color: 'red', href: '/admin/candidates?statusFilter=Rejected' },
-              { label: 'Open Jobs',           value: adminMetrics.openJobsCount ?? '0', sub: 'Active Requirements', icon: Briefcase, color: 'blue', href: '/admin/jobs?status=Open' },
-            ].map((m, i) => {
-              const Icon = m.icon;
-              const bg: Record<string, string> = {
-                blue: 'bg-blue-50 text-blue-600', emerald: 'bg-emerald-50 text-emerald-600',
-                violet: 'bg-violet-50 text-violet-600', amber: 'bg-amber-50 text-amber-600',
-                red: 'bg-red-50 text-red-600'
-              };
-              // Determine correct link navigation
-              const handleClick = () => {
-                if (m.href.includes('statusFilter=')) {
-                  const status = decodeURIComponent(m.href.split('statusFilter=')[1]);
-                  navigate('/admin/candidates', { state: { statusFilter: status } });
-                } else if (m.href.includes('status=')) {
-                  navigate('/admin/jobs');
-                } else if (m.href.startsWith('tab:')) {
-                  setActiveTab(m.href.replace('tab:', '') as any);
-                } else {
-                  navigate(m.href);
-                }
-              };
-              
-              return (
-                <button key={i} onClick={handleClick}
-                  className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer w-full">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${bg[m.color]}`}><Icon className="w-4 h-4" /></div>
-                  <div className="text-slate-800 mb-0.5" style={{ fontWeight: 700, fontSize: '1.75rem' }}>{m.value}</div>
-                  <div className="text-slate-500 text-sm">{m.label}</div>
-                  <div className="text-slate-400 text-xs mt-0.5">{m.sub}</div>
-                </button>
-              );
-            })}
-=======
           {/* Top Row: Pipeline Statuses */}
           <div className="space-y-2 mb-4">
             <div className="flex items-center justify-between">
@@ -770,7 +721,6 @@ export function AdminDashboard() {
                 );
               })}
             </div>
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
           </div>
 
           <div className="mb-5">
@@ -900,15 +850,6 @@ export function AdminDashboard() {
               {/* Summary Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 {[
-<<<<<<< HEAD
-                  { label: 'Active JRs', value: divisionData.totalJRs, color: 'text-blue-600', bg: 'bg-blue-50', link: `/admin/jobs?division=${activeDivision}` },
-                  { label: 'Open Positions', value: divisionData.openPositions, color: 'text-indigo-600', bg: 'bg-indigo-50', link: `/admin/jobs?division=${activeDivision}&status=Open` },
-                  { label: 'Screening Round', value: divisionData.pipeline?.screening || 0, color: 'text-amber-600', bg: 'bg-amber-50', link: `/admin/candidates?statusFilter=Screening` },
-                  { label: 'Interview Stage', value: divisionData.pipeline?.interview || 0, color: 'text-violet-600', bg: 'bg-violet-50', link: `/admin/candidates?statusFilter=Interview%20Scheduled` },
-                  { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', link: `/admin/candidates?statusFilter=Selected` },
-                  { label: 'Joined Candidates', value: divisionData.pipeline?.joined || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', link: `/admin/candidates?statusFilter=Joined` },
-                  { label: 'Yet To Be Joined', value: divisionData.pipeline?.yetToJoin || 0, color: 'text-cyan-600', bg: 'bg-cyan-50', link: `/admin/candidates?statusFilter=Yet%20To%20Join` },
-=======
                   { label: 'Active JRs', value: divisionData.totalJRs, color: 'text-blue-600', bg: 'bg-blue-50', link: `/admin/jobs?division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&company=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Open Positions', value: divisionData.openPositions, color: 'text-indigo-600', bg: 'bg-indigo-50', link: `/admin/jobs?division=${activeDivision}&status=Open&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&company=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Screening Round', value: divisionData.pipeline?.screening || 0, color: 'text-amber-600', bg: 'bg-amber-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Eligible,Screening,Shortlisted,Submitted to Client,Submitted To Client,Sublitted To Client,Walkin Company,Walkin WHM,Call Back,Hold,No Response,Duplicate-Client,Walk-in Submitted,Contacted,Interested,Selected for Call,New,HR Shortlist')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
@@ -916,7 +857,6 @@ export function AdminDashboard() {
                   { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,L2 Select,Final Select,VNA Select,Client Select')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Yet To Join', value: divisionData.pipeline?.yetToJoin || 0, color: 'text-purple-600', bg: 'bg-purple-50', slicerKey: 'yetToJoin', link: `/admin/candidates?statusIn=${encodeURIComponent('Yet To Join,Joining Date Confirmed,Joining Postponed')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Joined Candidates', value: divisionData.pipeline?.joined || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', slicerKey: 'joined', link: `/admin/candidates?statusFilter=Joined&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
                 ].map((s, i) => (
                   <button key={i} onClick={() => navigate(s.link)} className={`${s.bg} rounded-2xl p-4 border border-slate-100 shadow-sm text-center hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer w-full`}>
                     <div className={`text-2xl ${s.color}`} style={{ fontWeight: 700 }}>{s.value}</div>

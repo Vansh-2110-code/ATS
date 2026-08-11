@@ -8,12 +8,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-<<<<<<< HEAD
-=======
 import { dedupeCompanies } from '../../utils/companyUtils';
 import { CANDIDATE_STATUS_OPTIONS, CANDIDATE_STATUS_COLORS } from '../../utils/candidateStatusUtils';
 import { CopyableContact } from '../../components/CopyableContact';
->>>>>>> d278b7f (fix: resolve multiple issues - status counts, joining form validation, copy contact, quick search filters)
+
 
 const API_BASE = window.location.origin;
 
