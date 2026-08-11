@@ -570,8 +570,9 @@ class ApiService {
     return this.request<any>(`/dashboard/recruiter${query ? `?${query}` : ''}`);
   }
 
-  async getTLDashboard() {
-    return this.request<any>('/dashboard/tl');
+  async getTLDashboard(params: Record<string, string> = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request<any>(`/dashboard/tl${query ? `?${query}` : ''}`);
   }
 
   async getManagerDashboard(params: Record<string, string> = {}) {

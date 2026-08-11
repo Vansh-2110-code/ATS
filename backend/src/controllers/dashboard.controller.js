@@ -7,6 +7,7 @@ const Attendance = require('../models/Attendance');
 const AuditLog = require('../models/AuditLog');
 const WalkIn = require('../models/WalkIn');
 const TeamMember = require('../models/TeamMember');
+const Job = require('../models/Job');
 const { getDateRange } = require('../utils/helpers');
 
 // GET /api/dashboard/recruiter
@@ -195,7 +196,7 @@ exports.tlDashboard = async (req, res, next) => {
       .populate('memberId', 'name email employeeId status')
       .lean();
     
-    const recruiters = teamAssignments
+    let recruiters = teamAssignments
       .map(ta => ta.memberId)
       .filter(u => u && u.status === 'Active');
 
