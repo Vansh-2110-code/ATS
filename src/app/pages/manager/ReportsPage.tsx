@@ -20,7 +20,7 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
 
   // Advanced reports states
-  const [activeView, setActiveView] = useState<'recruiter' | 'customer' | 'division' | 'aging' | 'conversion'>('recruiter');
+  const [activeView, setActiveView] = useState<string>('activeJRs');
   const [customerData, setCustomerData] = useState<any[]>([]);
   const [divisionData, setDivisionData] = useState<any[]>([]);
   const [agingData, setAgingData] = useState<any>({ avgStageAging: {}, candidates: [] });
@@ -306,7 +306,31 @@ export function ReportsPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      
+      {/* Report View Switcher */}
+      <div className="flex flex-wrap gap-1.5 bg-slate-100 p-1.5 rounded-xl w-fit mb-6 mt-4">
+        {[
+          { id: 'activeJRs', label: 'Active JRs' },
+          { id: 'recruiter', label: 'Recruiter Wise' },
+          { id: 'customer', label: 'Customer Wise' },
+          { id: 'division', label: 'Division Wise' },
+          { id: 'aging', label: 'Aging Reports' },
+          { id: 'conversion', label: 'Conversion Ratio' }
+        ].map(v => (
+          <button
+            key={v.id}
+            onClick={() => setActiveView(v.id)}
+            className={`px-4 py-2 text-sm rounded-lg transition-colors ${activeView === v.id ? 'bg-white text-green-700 shadow-sm font-bold' : 'text-slate-500 hover:bg-slate-200 font-medium'}`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {activeView === 'activeJRs' && (
+        <div className="space-y-6">
+
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -1135,5 +1159,7 @@ export function ReportsPage() {
         </table>
       </div>
     </div>
+  )}
+  </div>
   );
 }
