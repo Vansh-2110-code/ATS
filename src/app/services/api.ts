@@ -601,11 +601,14 @@ class ApiService {
     });
   }
 
-  async getDivisionDashboard(division: string, company?: string, tlId?: string, recruiterId?: string) {
+  async getDivisionDashboard(division: string, company?: string, tlId?: string, recruiterId?: string, range?: string, from?: string, to?: string) {
     const params = new URLSearchParams({ division });
     if (company && company !== 'All Companies') params.append('company', company);
     if (tlId && tlId !== 'All Team Leaders') params.append('tlId', tlId);
     if (recruiterId && recruiterId !== 'All Recruiters') params.append('recruiterId', recruiterId);
+    if (range) params.append('range', range);
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
     return this.request<any>(`/dashboard/division?${params.toString()}`);
   }
 

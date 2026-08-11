@@ -467,6 +467,15 @@ exports.managerDashboard = async (req, res, next) => {
 // GET /api/dashboard/admin
 exports.adminDashboard = async (req, res, next) => {
   try {
+    const { range, dateRange, startDate, endDate, from, to } = req.query;
+    const selectedRange = (range || dateRange || 'all').toLowerCase();
+    const customStart = (startDate && String(startDate).trim()) || (from && String(from).trim()) || null;
+    const customEnd = (endDate && String(endDate).trim()) || (to && String(to).trim()) || null;
+
+    const { getDateRange } = require('../utils/helpers');
+    const { start, end } = getDateRange(selectedRange, customStart, customEnd);
+    const dateMatch = selectedRange === 'all' ? {} : { createdAt: { $gte: start, $lt: end } };
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -475,7 +484,7 @@ exports.adminDashboard = async (req, res, next) => {
     // Active users today
     const activeLogins = await Attendance.countDocuments({ date: { $gte: today, $lt: tomorrow } });
     const totalUsers = await User.countDocuments({ status: 'Active' });
-    const totalResumes = await Candidate.countDocuments();
+    const totalResumes = await Candidate.countDocuments(dateMatch);
 
     // Attendance rate
     const attendanceRate = totalUsers > 0 ? Math.round((activeLogins / totalUsers) * 100) : 0;
@@ -483,26 +492,31 @@ exports.adminDashboard = async (req, res, next) => {
     // ── NEW DASHBOARD CARD COUNTS ────────────────────────────────────
     const Job = require('../models/Job');
 
-    // Pending Follow-ups: candidates with any follow-up note due today or earlier
+    // Pending Follow-ups: candidates with follow-up note in selected range (or due today/earlier if all)
+    const followUpFilter = selectedRange === 'all'
+      ? { 'notes.followUpDate': { $exists: true, $lte: tomorrow } }
+      : { ...dateMatch, 'notes.followUpDate': { $exists: true } };
+
     const pendingFollowUps = await Candidate.countDocuments({
       status: { $nin: ['Rejected', 'Joined', 'Exited'] },
-      'notes.followUpDate': { $exists: true, $lte: tomorrow },
+      ...followUpFilter,
     });
 
     // HR Round: candidates in HR Shortlist status
-    const hrRoundCount = await Candidate.countDocuments({ status: 'HR Shortlist' });
+    const hrRoundCount = await Candidate.countDocuments({ ...dateMatch, status: 'HR Shortlist' });
 
     // Follow to Join: candidates with status 'Yet To Join'
-    const followToJoinCount = await Candidate.countDocuments({ status: 'Yet To Join' });
+    const followToJoinCount = await Candidate.countDocuments({ ...dateMatch, status: 'Yet To Join' });
 
     // Joined count
-    const joinedCount = await Candidate.countDocuments({ status: 'Joined' });
+    const joinedCount = await Candidate.countDocuments({ ...dateMatch, status: 'Joined' });
 
     // Rejected count
-    const rejectedCount = await Candidate.countDocuments({ status: 'Rejected' });
+    const rejectedCount = await Candidate.countDocuments({ ...dateMatch, status: 'Rejected' });
 
     // Open Jobs count
-    const openJobsCount = await Job.countDocuments({ status: 'Open' });
+    const jobMatch = selectedRange === 'all' ? { status: 'Open' } : { status: 'Open', createdAt: { $gte: start, $lt: end } };
+    const openJobsCount = await Job.countDocuments(jobMatch);
 
     // Revenue this month (from Revenue model if it exists)
     let currentMonthRevenue = 0;
@@ -517,10 +531,12 @@ exports.adminDashboard = async (req, res, next) => {
     // ── END NEW COUNTS ───────────────────────────────────────────────
 
     // Source chart
-    const sourceChart = await Candidate.aggregate([
+    const sourcePipeline = [
+      ...(selectedRange !== 'all' ? [{ $match: { createdAt: { $gte: start, $lt: end } } }] : []),
       { $group: { _id: '$source', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
-    ]);
+    ];
+    const sourceChart = await Candidate.aggregate(sourcePipeline);
 
     // Recent alerts (from logs)
     const alerts = await AuditLog.find({ type: { $in: ['delete', 'system'] } })
@@ -530,25 +546,24 @@ exports.adminDashboard = async (req, res, next) => {
     // System metrics
     const todayLogs = await AuditLog.countDocuments({ timestamp: { $gte: today, $lt: tomorrow } });
 
-    
-      // Calculate total revenue and get candidate revenue details
-      const revenueData = await Candidate.aggregate([
-        { $match: { revenueGenerated: { $gt: 0 } } },
-        { $project: { _id: 1, name: 1, revenueGenerated: 1, joiningSalary: 1, placementPercentage: 1, dateOfJoining: 1, status: 1 } },
-        { $sort: { revenueGenerated: -1 } }
-      ]);
-      const totalRevenue = revenueData.reduce((sum, c) => sum + (c.revenueGenerated || 0), 0);
+    // Calculate total revenue and get candidate revenue details
+    const revPipeline = [
+      { $match: { revenueGenerated: { $gt: 0 }, ...(selectedRange !== 'all' ? { createdAt: { $gte: start, $lt: end } } : {}) } },
+      { $project: { _id: 1, name: 1, revenueGenerated: 1, joiningSalary: 1, placementPercentage: 1, dateOfJoining: 1, status: 1 } },
+      { $sort: { revenueGenerated: -1 } }
+    ];
+    const revenueData = await Candidate.aggregate(revPipeline);
+    const totalRevenue = revenueData.reduce((sum, c) => sum + (c.revenueGenerated || 0), 0);
 
-      res.json({
-        totalRevenue,
-        revenueCandidates: revenueData,
+    res.json({
+      totalRevenue,
+      revenueCandidates: revenueData,
       metrics: {
         activeLogins,
         totalUsers,
         totalResumes,
         attendanceRate,
         todayLogs,
-        // New dashboard card counts
         totalCandidates: totalResumes,
         pendingFollowUps,
         hrRoundCount,
@@ -720,7 +735,14 @@ exports.allTeamsDashboard = async (req, res, next) => {
 // GET /api/dashboard/division
 exports.divisionDashboard = async (req, res, next) => {
   try {
-    const { division = 'BPO', company, tlId, recruiterId } = req.query;
+    const { division = 'BPO', company, tlId, recruiterId, range, dateRange, startDate, endDate, from, to } = req.query;
+    const selectedRange = (range || dateRange || 'all').toLowerCase();
+    const customStart = (startDate && String(startDate).trim()) || (from && String(from).trim()) || null;
+    const customEnd = (endDate && String(endDate).trim()) || (to && String(to).trim()) || null;
+
+    const { getDateRange } = require('../utils/helpers');
+    const { start, end } = getDateRange(selectedRange, customStart, customEnd);
+
     const Job = require('../models/Job');
     const Candidate = require('../models/Candidate');
     const TeamMember = require('../models/TeamMember');
@@ -765,6 +787,10 @@ exports.divisionDashboard = async (req, res, next) => {
 
     const jobQuery = { division };
     const candQuery = { division };
+    if (selectedRange !== 'all') {
+      jobQuery.createdAt = { $gte: start, $lt: end };
+      candQuery.createdAt = { $gte: start, $lt: end };
+    }
 
     // Apply User / TL filter
     if (userIds.length > 0) {

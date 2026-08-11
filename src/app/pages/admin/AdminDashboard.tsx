@@ -578,7 +578,15 @@ export function AdminDashboard() {
       const loadDiv = async () => {
         try {
           setDivLoading(true);
-          const data = await api.getDivisionDashboard(activeDivision, divCompanyFilter, divTlFilter, divRecruiterFilter);
+          const data = await api.getDivisionDashboard(
+            activeDivision,
+            divCompanyFilter,
+            divTlFilter,
+            divRecruiterFilter,
+            dateRange.toLowerCase(),
+            customFrom,
+            customTo
+          );
           setDivisionData(data);
         } catch (err) {
           console.error('Failed to load division dashboard:', err);
@@ -588,7 +596,7 @@ export function AdminDashboard() {
       };
       loadDiv();
     }
-  }, [activeTab, activeDivision, divCompanyFilter, divTlFilter, divRecruiterFilter]);
+  }, [activeTab, activeDivision, divCompanyFilter, divTlFilter, divRecruiterFilter, dateRange, customFrom, customTo]);
 
   // ── Derived values ───────────────────────────────────────────────────────────
   const STATUS_CARDS = dashData?.pipeline
