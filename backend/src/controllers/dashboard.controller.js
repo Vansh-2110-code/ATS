@@ -724,11 +724,11 @@ exports.divisionDashboard = async (req, res, next) => {
     const totalJRs = openJobs.length;
 
     // 2. Candidates in each stage
-    const screeningCount = await Candidate.countDocuments({ division, currentStage: 'Screening', status: { $ne: 'Rejected' } });
-    const interviewCount = await Candidate.countDocuments({ division, currentStage: 'Interview', status: { $ne: 'Rejected' } });
-    const offerCount = await Candidate.countDocuments({ division, currentStage: 'Offer', status: { $ne: 'Rejected' } });
-    const joinedCount = await Candidate.countDocuments({ division, status: 'Joined' });
-    const yetToJoinCount = await Candidate.countDocuments({ division, status: 'Yet To Join' });
+    const candQuery = { division };
+    const screeningStatuses = [
+      'Screening', 'Contacted', 'Interested', 'Selected for Call', 
+      'Sourced', 'Not Interested', 'Call Back', 'No Response'
+    ];
 
     const interviewStatuses = [
       'Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Interview',
@@ -928,7 +928,6 @@ exports.advancedReports = async (req, res, next) => {
       .populate('assignedRecruiter', 'name');
 
     // Fetch TL mappings
-    const TeamMember = require('../models/TeamMember');
     const allAssignments = await TeamMember.find({ removedAt: null }).populate('teamLeaderId', 'name');
     const recruiterToTlMap = {};
     allAssignments.forEach(ta => {
@@ -1053,7 +1052,6 @@ exports.advancedReports = async (req, res, next) => {
     }).select('name phone email positionApplied clientName status jrNumber assignedRecruiter assignedRecruiterName updatedAt createdAt division').lean();
 
     const recruiterIds = [...new Set(activeProfilesCandidates.map(c => c.assignedRecruiter?.toString()).filter(Boolean))];
-    const TeamMember = mongoose.models.TeamMember || require('../models/TeamMember');
     const teamMembers = await TeamMember.find({ memberId: { $in: recruiterIds }, removedAt: null })
       .populate('teamLeaderId', 'name')
       .lean();
