@@ -848,11 +848,32 @@ exports.divisionDashboard = async (req, res, next) => {
       if (targetTlName && !userNames.includes(targetTlName)) userNames.push(targetTlName);
     }
 
-    const jobQuery = { division };
-    const candQuery = { division };
+    const divRegex = new RegExp(`^${division}$`, 'i');
+    const candDivisionCond = {
+      $or: [
+        { division: divRegex },
+        { division: { $exists: false } },
+        { division: '' },
+        { division: null }
+      ]
+    };
+
+    const jobQuery = { division: divRegex };
+    let candQuery = { ...candDivisionCond };
     if (selectedRange !== 'all') {
       jobQuery.createdAt = { $gte: start, $lt: end };
-      candQuery.createdAt = { $gte: start, $lt: end };
+      candQuery = {
+        $and: [
+          candDivisionCond,
+          {
+            $or: [
+              { createdAt: { $gte: start, $lt: end } },
+              { updatedAt: { $gte: start, $lt: end } },
+              { dateOfJoining: { $gte: start, $lt: end } }
+            ]
+          }
+        ]
+      };
     }
 
     // Apply User / TL filter
@@ -875,25 +896,34 @@ exports.divisionDashboard = async (req, res, next) => {
 
       if (company && company !== 'All Companies') {
         const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
-        candQuery.$and = [
-          { $or: [{ clientName: companyRegex }, { company: companyRegex }, { client: companyRegex }] },
-          { $or: candUserCond }
-        ];
+        candQuery = {
+          $and: [
+            candQuery,
+            { $or: [{ clientName: companyRegex }, { company: companyRegex }, { client: companyRegex }] },
+            { $or: candUserCond }
+          ]
+        };
         jobQuery.$and = [
           { $or: [{ companyName: companyRegex }, { client: companyRegex }] },
           { $or: jobUserCond }
         ];
       } else {
-        candQuery.$or = candUserCond;
+        candQuery = {
+          $and: [
+            candQuery,
+            { $or: candUserCond }
+          ]
+        };
         jobQuery.$or = jobUserCond;
       }
     } else if (company && company !== 'All Companies') {
       const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
-      candQuery.$or = [
-        { clientName: companyRegex },
-        { company: companyRegex },
-        { client: companyRegex },
-      ];
+      candQuery = {
+        $and: [
+          candQuery,
+          { $or: [{ clientName: companyRegex }, { company: companyRegex }, { client: companyRegex }] }
+        ]
+      };
       jobQuery.$or = [
         { companyName: companyRegex },
         { client: companyRegex },
@@ -926,12 +956,6 @@ exports.divisionDashboard = async (req, res, next) => {
       'Offer Released', 'Offer Accept', 'Offer Accepted', 'Document Initialized',
       'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete',
       'Document Pending', 'Documentation'
-    ];
-
-    const baseYetToJoinOr = [
-      { status: { $in: ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'] } },
-      { candidateStatusPostOffer: 'Yet To Join' },
-      { currentStage: 'Joining', status: { $ne: 'Joined' } }
     ];
 
     function buildQueryWithOr(baseQuery, extraOrArray) {
@@ -973,12 +997,31 @@ exports.divisionDashboard = async (req, res, next) => {
       { status: { $in: ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'] } }
     ]);
 
+    // Build joined query matching division and optional filters
+    const joinedDivQuery = {
+      $or: [
+        { division: divRegex },
+        { division: { $exists: false } },
+        { division: '' },
+        { division: null }
+      ],
+      status: 'Joined'
+    };
+    if (userIds.length > 0) {
+      joinedDivQuery.assignedRecruiter = { $in: userIds };
+    }
+    if (company && company !== 'All Companies') {
+      const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      joinedDivQuery.$and = [
+        { $or: [{ clientName: companyRegex }, { company: companyRegex }, { client: companyRegex }] }
+      ];
+    }
+
     const [
       screeningCount,
       interviewCount,
       offerCount,
       yetToJoinCount,
-      joinedCount,
       joinedCandidates,
       yetToJoinCandidates,
       offeredCandidates
@@ -987,10 +1030,9 @@ exports.divisionDashboard = async (req, res, next) => {
       Candidate.countDocuments(interviewMatch),
       Candidate.countDocuments(offerMatch),
       Candidate.countDocuments(yetToJoinMatch),
-      Candidate.countDocuments({ ...candQuery, status: 'Joined' }),
-      Candidate.find({ ...candQuery, status: 'Joined' })
-        .select('name positionApplied clientName dateOfJoining assignedRecruiterName status')
-        .sort('-dateOfJoining'),
+      Candidate.find(joinedDivQuery)
+        .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status createdAt updatedAt')
+        .sort('-dateOfJoining -updatedAt -createdAt'),
       Candidate.find(yetToJoinMatch)
         .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status candidateStatusPostOffer')
         .sort('-createdAt'),
@@ -998,6 +1040,8 @@ exports.divisionDashboard = async (req, res, next) => {
         .select('name positionApplied clientName dateOfJoining expectedDateOfJoining assignedRecruiterName status candidateStatusPostOffer')
         .sort('-createdAt')
     ]);
+
+    const joinedCount = joinedCandidates.length;
 
     res.json({
       division,
@@ -1240,9 +1284,9 @@ exports.advancedReports = async (req, res, next) => {
       };
     }));
 
-    // 7. Active Status Profiles (Documentation process, Pending with Customer, etc.)
+    // 7. Active Status Profiles (Documentation process, Pending with Customer, Joined, etc.)
     const activeProfilesCandidates = await Candidate.find({
-      status: { $nin: ['Rejected', 'Exited', 'Joined'] }
+      status: { $nin: ['Rejected', 'Exited', 'Black List', 'Joined and Abort'] }
     }).select('name phone email positionApplied clientName status jrNumber assignedRecruiter assignedRecruiterName updatedAt createdAt division').lean();
 
     const recruiterIds = [...new Set(activeProfilesCandidates.map(c => c.assignedRecruiter?.toString()).filter(Boolean))];
@@ -1277,6 +1321,7 @@ exports.advancedReports = async (req, res, next) => {
       else if (rawStatus === 'Submitted To Client' || rawStatus === 'Sublitted To Client' || rawStatus === 'Walk-in Submitted') displayStatus = 'Submitted to Client';
       else if (rawStatus === 'HR Shortlist' || rawStatus === 'SPOC Shortlisted' || rawStatus === 'HR Round Scheduled') displayStatus = 'Eligible';
       else if (rawStatus === 'Selected' || rawStatus === 'L1/Final') displayStatus = 'Final Select';
+      else if (rawStatus === 'Joined') displayStatus = 'Joined';
 
       return {
         _id: c._id,

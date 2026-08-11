@@ -122,10 +122,11 @@ export function ReportsPage() {
   // Filtered Active Profiles
   const filteredActiveProfiles = activeProfilesData.filter(c => {
     if (activeProfileFilter === 'All') return true;
-    if (activeProfileFilter === 'Documentation') return ['Documentation', 'Document Pending', 'Documents Pending'].includes(c.status);
-    if (activeProfileFilter === 'Pending Customer') return ['HR Shortlist', 'SPOC Shortlisted', 'Selected for Call', 'Operations Round', 'Interview Scheduled', 'Written Test'].includes(c.status);
-    if (activeProfileFilter === 'Yet To Join') return ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'].includes(c.status);
-    if (activeProfileFilter === 'Screening') return ['Screening', 'Contacted', 'Interested', 'Selected for Call', 'Eligible Candidates', 'Call Back'].includes(c.status);
+    if (activeProfileFilter === 'Joined') return c.status === 'Joined';
+    if (activeProfileFilter === 'Documentation') return ['Documentation', 'Document Pending', 'Documents Pending', 'Documentation Completed', 'Documentation Incomplete', 'Document Initialized'].includes(c.status);
+    if (activeProfileFilter === 'Pending Customer') return ['HR Shortlist', 'SPOC Shortlisted', 'Selected for Call', 'Operations Round', 'Interview Scheduled', 'Written Test', 'Submitted to Client', 'VNA Select', 'Test Select', 'L1 Select', 'L2 Select', 'Final Select'].includes(c.status);
+    if (activeProfileFilter === 'Yet To Join') return ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed', 'Waiting for Offer', 'Offer Accept'].includes(c.status);
+    if (activeProfileFilter === 'Screening') return ['Screening', 'Contacted', 'Interested', 'Selected for Call', 'Eligible Candidates', 'Eligible', 'Call Back', 'Hold', 'Walkin Company', 'Walkin WHM'].includes(c.status);
     return true;
   });
 
@@ -421,7 +422,7 @@ export function ReportsPage() {
               <p className="text-slate-500 text-xs mt-0.5">Filter active candidates across Documentation, Pending with Customer, Yet to Join & Screening</p>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {['All', 'Documentation', 'Pending Customer', 'Yet To Join', 'Screening'].map(flt => (
+              {['All', 'Joined', 'Documentation', 'Pending Customer', 'Yet To Join', 'Screening'].map(flt => (
                 <button
                   key={flt}
                   onClick={() => setActiveProfileFilter(flt)}
