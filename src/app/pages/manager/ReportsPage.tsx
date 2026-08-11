@@ -47,10 +47,10 @@ export function ReportsPage() {
   const [expandedJR, setExpandedJR] = useState<string | null>(null);
 
   const fmt = (n: number) => {
-    if (!n) return 'Γé╣0';
-    if (n >= 10000000) return `Γé╣${(n / 10000000).toFixed(2)} Cr`;
-    if (n >= 100000) return `Γé╣${(n / 100000).toFixed(1)} L`;
-    return `Γé╣${(n / 1000).toFixed(0)} K`;
+    if (!n) return '₹0';
+    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
+    if (n >= 100000) return `₹${(n / 100000).toFixed(1)} L`;
+    return `₹${(n / 1000).toFixed(0)} K`;
   };
 
   const loadReports = async (from: string, to: string) => {
@@ -886,3 +886,4 @@ export function ReportsPage() {
     </div>
   );
 }
+
