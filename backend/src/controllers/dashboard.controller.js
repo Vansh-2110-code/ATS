@@ -182,6 +182,10 @@ exports.tlDashboard = async (req, res, next) => {
   try {
     const { range = 'month', startDate, endDate, tlId, division, company, customer, recruiter } = req.query;
     const currentUser = req.user;
+    const { getDateRange } = require('../utils/helpers');
+    const selectedRange = (range || 'month').toLowerCase();
+    const { start, end } = getDateRange(selectedRange, startDate, endDate);
+    const dateFilter = selectedRange === 'all' ? {} : { $gte: start, $lt: end };
 
     // Determine target TL ID: Admins can specify, TLs get their own
     const targetTlId = (currentUser.role === 'admin' || currentUser.role === 'manager') && tlId ? tlId : currentUser._id;
@@ -341,6 +345,7 @@ exports.tlDashboard = async (req, res, next) => {
     const onTarget = teamStats.filter(t => t.onTarget).length;
 
     res.json({
+      summary,
       teamMembers: teamStats,
       corrections,
       teamHealth: {
@@ -714,33 +719,120 @@ exports.allTeamsDashboard = async (req, res, next) => {
 // GET /api/dashboard/division
 exports.divisionDashboard = async (req, res, next) => {
   try {
-    const { division = 'BPO' } = req.query;
+    const { division = 'BPO', company, tlId, recruiterId } = req.query;
     const Job = require('../models/Job');
     const Candidate = require('../models/Candidate');
+    const TeamMember = require('../models/TeamMember');
+    const User = require('../models/User');
+
+    let userIds = [];
+    let userNames = [];
+
+    if (recruiterId && recruiterId !== 'All Recruiters') {
+      const recUser = await User.findOne({
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(recruiterId) ? recruiterId : null },
+          { name: recruiterId }
+        ]
+      }).select('_id name');
+      if (recUser) {
+        userIds = [recUser._id];
+        userNames = [recUser.name];
+      } else {
+        userIds = [recruiterId];
+        userNames = [recruiterId];
+      }
+    } else if (tlId && tlId !== 'All Team Leaders') {
+      const tlUser = await User.findOne({
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(tlId) ? tlId : null },
+          { name: tlId }
+        ]
+      }).select('_id name');
+      const targetTlId = tlUser ? tlUser._id : tlId;
+      const targetTlName = tlUser ? tlUser.name : tlId;
+
+      const teamAssigned = await TeamMember.find({ teamLeaderId: targetTlId, removedAt: null }).lean();
+      const memberIds = teamAssigned.map(m => m.memberId).filter(Boolean);
+
+      userIds = [targetTlId, ...memberIds];
+
+      const memberUsers = await User.find({ _id: { $in: userIds } }).select('_id name');
+      userNames = memberUsers.map(u => u.name).filter(Boolean);
+      if (targetTlName && !userNames.includes(targetTlName)) userNames.push(targetTlName);
+    }
+
+    const jobQuery = { division };
+    const candQuery = { division };
+
+    // Apply User / TL filter
+    if (userIds.length > 0) {
+      const candUserCond = [
+        { assignedRecruiter: { $in: userIds } },
+        { assignedRecruiterName: { $in: userNames } }
+      ];
+
+      const candidateJobs = await Candidate.distinct('positionApplied', { assignedRecruiter: { $in: userIds } });
+      const candidateJrs = await Candidate.distinct('jrNumber', { assignedRecruiter: { $in: userIds } });
+
+      const jobUserCond = [
+        { createdBy: { $in: userIds } },
+        { 'assignedRecruiters.recruiterId': { $in: userIds } },
+        { recruiterName: { $in: userNames } }
+      ];
+      if (candidateJobs.length > 0) jobUserCond.push({ jobTitle: { $in: candidateJobs } });
+      if (candidateJrs.length > 0) jobUserCond.push({ jrNumber: { $in: candidateJrs } });
+
+      if (company && company !== 'All Companies') {
+        const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+        candQuery.$and = [
+          { $or: [{ clientName: companyRegex }, { company: companyRegex }, { client: companyRegex }] },
+          { $or: candUserCond }
+        ];
+        jobQuery.$and = [
+          { $or: [{ companyName: companyRegex }, { client: companyRegex }] },
+          { $or: jobUserCond }
+        ];
+      } else {
+        candQuery.$or = candUserCond;
+        jobQuery.$or = jobUserCond;
+      }
+    } else if (company && company !== 'All Companies') {
+      const companyRegex = new RegExp(`^${company.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      candQuery.$or = [
+        { clientName: companyRegex },
+        { company: companyRegex },
+        { client: companyRegex },
+      ];
+      jobQuery.$or = [
+        { companyName: companyRegex },
+        { client: companyRegex },
+      ];
+    }
 
     // 1. Open Positions & total JRs
-    const openJobs = await Job.find({ division, status: 'Open' });
+    const openJobs = await Job.find({ ...jobQuery, status: 'Open' });
     const openPositions = openJobs.reduce((sum, j) => sum + (j.positions || 0), 0);
     const totalJRs = openJobs.length;
 
-    // 2. Candidates in each stage
-    const candQuery = { division };
+    // 2. Comprehensive Candidate Stage Matching
     const screeningStatuses = [
-      'Screening', 'Contacted', 'Interested', 'Selected for Call', 
-      'Sourced', 'Not Interested', 'Call Back', 'No Response'
+      'Eligible', 'Eligible Candidates', 'Screening', 'Shortlisted', 'Submitted to Client', 'Submitted To Client',
+      'Sublitted To Client', 'Walkin Company', 'Walkin WHM', 'Call Back', 'Hold', 'No Response',
+      'Duplicate-Client', 'Walk-in Submitted', 'Contacted', 'Interested', 'Selected for Call', 'New', 'HR Shortlist',
+      'Did Not Pick', 'Switched Off', 'Busy', 'Not Reachable', 'Wrong Number', 'Ringing', 'No Pick'
     ];
 
     const interviewStatuses = [
       'Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Interview',
-      'Selected for Interview', 'Written Test', 'Operations Round', 'Interview Feedback Pending',
-      'Test Select', 'Test Reject'
+      'Selected for Interview', 'Written Test', 'Operations Round', 'Interview Feedback Pending'
     ];
 
     const offerStatuses = [
       'Document Initialized', 'Documennt Initialted', 'Documentation Completed',
       'Documentation Incomplete', 'Waiting for Offer', 'Offer Accept', 'Offered',
       'Offer Released', 'Offer Accepted', 'Document Pending', 'Documentation',
-      'Selected', 'L1 Select', 'L2 Select', 'Final Select', 'VNA Select', 'Client Select'
+      'Selected', 'L1 Select', 'L2 Select', 'Final Select', 'VNA Select', 'Test Select', 'Client Select'
     ];
 
     const baseYetToJoinOr = [
@@ -812,16 +904,20 @@ exports.divisionDashboard = async (req, res, next) => {
 
     res.json({
       division,
+      company: company || 'All Companies',
+      tlId: tlId || 'All Team Leaders',
+      recruiterId: recruiterId || 'All Recruiters',
       openPositions,
       totalJRs,
       pipeline: {
         screening: screeningCount,
         interview: interviewCount,
         offer: offerCount,
+        yetToJoin: yetToJoinCount,
         joined: joinedCount,
-        yetToJoin: yetToJoinCount
       },
-      joinedCandidates
+      joinedCandidates,
+      yetToJoinCandidates
     });
   } catch (err) {
     next(err);
@@ -1063,8 +1159,27 @@ exports.advancedReports = async (req, res, next) => {
       }
     });
 
+    const masterStatusesSet = new Set([
+      'Eligible', 'Not Eligible', 'Not Interested', 'No Response', 'Duplicate-Client', 'Call Back',
+      'Hold', 'Submitted to Client', 'Walkin Company', 'Walkin WHM', 'No Show', 'VNA Select', 'VNA Reject',
+      'Test Select', 'Test Reject', 'Candidate Drop Post L1 Select', 'Candidate Drop Post L2 Select',
+      'Candidate Drop During Final Stage', 'L1 Select', 'L1 Reject', 'L2 Select', 'L2 Reject',
+      'Final Select', 'Final Reject', 'Document Initialized', 'Documentation Completed',
+      'Documentation Incomplete', 'Waiting for Offer', 'Offer Accept', 'Offer Reject', 'Joined',
+      'Joined and Abort'
+    ]);
+
     const activeProfilesReport = activeProfilesCandidates.map(c => {
       const daysPending = Math.ceil((new Date() - new Date(c.updatedAt || c.createdAt)) / (1000 * 60 * 60 * 24));
+      let rawStatus = c.status || 'Eligible';
+      let displayStatus = masterStatusesSet.has(rawStatus) ? rawStatus : 'Eligible';
+      if (rawStatus === 'Screening' || rawStatus === 'New' || rawStatus === 'Contacted' || rawStatus === 'Interested' || rawStatus === 'Selected for Call' || rawStatus === 'Eligible Candidates') displayStatus = 'Eligible';
+      else if (rawStatus === 'Document Pending' || rawStatus === 'Documentation' || rawStatus === 'Documennt Initialted') displayStatus = 'Document Initialized';
+      else if (rawStatus === 'Yet To Join' || rawStatus === 'Joining Date Confirmed' || rawStatus === 'Joining Postponed') displayStatus = 'Offer Accept';
+      else if (rawStatus === 'Submitted To Client' || rawStatus === 'Sublitted To Client' || rawStatus === 'Walk-in Submitted') displayStatus = 'Submitted to Client';
+      else if (rawStatus === 'HR Shortlist' || rawStatus === 'SPOC Shortlisted' || rawStatus === 'HR Round Scheduled') displayStatus = 'Eligible';
+      else if (rawStatus === 'Selected' || rawStatus === 'L1/Final') displayStatus = 'Final Select';
+
       return {
         _id: c._id,
         name: c.name,
@@ -1072,7 +1187,7 @@ exports.advancedReports = async (req, res, next) => {
         email: c.email,
         positionApplied: c.positionApplied || '—',
         clientName: c.clientName || '—',
-        status: c.status || 'Active',
+        status: displayStatus,
         jrNumber: c.jrNumber || '—',
         recruiter: c.assignedRecruiterName || 'Unassigned',
         teamLeader: (c.assignedRecruiter && recruiterToTLMap[c.assignedRecruiter.toString()]) ? recruiterToTLMap[c.assignedRecruiter.toString()] : 'Unassigned',

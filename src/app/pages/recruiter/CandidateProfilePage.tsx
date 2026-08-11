@@ -105,7 +105,7 @@ export function CandidateProfilePage() {
   const isTLOrAdmin = isTL || isAdmin;
 
   const [candidate, setCandidate] = useState<any>(null);
-  const [status, setStatus] = useState('New');
+  const [status, setStatus] = useState('Eligible');
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<any[]>([]);
   const [followUpDate, setFollowUpDate] = useState('');
@@ -235,7 +235,7 @@ export function CandidateProfilePage() {
         ]);
         const c = cand.candidate || cand;
         setCandidate(c);
-        setStatus(c.status || 'New');
+        setStatus(c.status || 'Eligible');
         setNotes(c.notes || []);
         setCallHistory(calls.calls || calls || []);
         setDocuments(c.documents || []);
@@ -502,7 +502,7 @@ export function CandidateProfilePage() {
         reason: reassignReason,
       });
       setCandidate(updated);
-      setStatus(updated.status || 'New');
+      setStatus(updated.status || 'Eligible');
       setReassignOpen(false);
       setReassignReason('');
       setReassignRecruiterId('');
@@ -931,7 +931,7 @@ export function CandidateProfilePage() {
               </div>
               <div>
                 <p className="text-slate-400 text-xs mb-1">Current Status</p>
-                <span className="px-2.5 py-1 bg-green-50 text-green-700 text-xs rounded-full font-medium border border-green-100">{candidate.status || 'New'}</span>
+                <span className="px-2.5 py-1 bg-green-50 text-green-700 text-xs rounded-full font-medium border border-green-100">{candidate.status || 'Eligible'}</span>
               </div>
               <div>
                 <p className="text-slate-400 text-xs mb-1">Joining Status</p>

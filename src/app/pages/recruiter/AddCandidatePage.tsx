@@ -722,12 +722,17 @@ export function AddCandidatePage() {
           fd.append('finalDetailsSubmitted', 'true');
         }
         if (form.candidateAge) fd.append('candidateAge', form.candidateAge);
-        if (form.recruiterStatus) fd.append('recruiterStatus', form.recruiterStatus);
-        if (form.walkInSchedule) fd.append('walkInSchedule', form.walkInSchedule);
-        if (form.tentativeDOJ) fd.append('tentativeDOJ', form.tentativeDOJ);
+        if (form.recruiterStatus) {
+          fd.append('status', form.recruiterStatus);
+        } else {
+          fd.append('status', 'Eligible');
+        }
       } else {
-        // If they did not speak to the candidate, status should be 'New'
-        fd.append('status', 'New');
+        if (form.recruiterStatus) {
+          fd.append('status', form.recruiterStatus);
+        } else {
+          fd.append('status', 'Eligible');
+        }
       }
 
       // Interview Status

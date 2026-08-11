@@ -107,6 +107,7 @@ export function TLDashboard() {
   const [customer, setCustomer] = useState('');
   const [recruiter, setRecruiter] = useState('');
   const [companies, setCompanies] = useState<any[]>([]);
+  const [recruiters, setRecruiters] = useState<any[]>([]);
   const [dashData, setDashData] = useState<any>(null);
   const [activeSlicer, setActiveSlicer] = useState<string>('All');
 

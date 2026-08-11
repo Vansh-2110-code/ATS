@@ -16,6 +16,9 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { getGreeting } from '../../utils/greetingUtils';
 import { TeamStructureManager } from '../../components/TeamStructureManager';
+import { TeamPerformanceReviews } from '../../components/TeamPerformanceReviews';
+import { SlicerFilteredDataView } from '../../components/SlicerFilteredDataView';
+import { dedupeCompanies } from '../../utils/companyUtils';
 
 // ─── Source Links ─────────────────────────────────────────────────────────────
 const SOURCE_LINKS: Record<string, string> = {
@@ -58,31 +61,31 @@ const STATUS_ICON_MAP: Record<string, any> = {
   'Rejected': X,
 };
 
-const STATUS_COLOR_LIST = ['emerald','red','orange','amber','violet','indigo','cyan','teal','sky','pink','green'];
+const STATUS_COLOR_LIST = ['emerald', 'red', 'orange', 'amber', 'violet', 'indigo', 'cyan', 'teal', 'sky', 'pink', 'green'];
 
 const STATUS_COLOR_MAP: Record<string, { card: string; icon: string; badge: string }> = {
-  emerald: { card: 'border-emerald-100 bg-emerald-50/60 hover:bg-emerald-50',  icon: 'bg-emerald-100 text-emerald-600', badge: 'text-emerald-700' },
-  red:     { card: 'border-red-100 bg-red-50/60 hover:bg-red-50',              icon: 'bg-red-100 text-red-500',         badge: 'text-red-600' },
-  orange:  { card: 'border-orange-100 bg-orange-50/60 hover:bg-orange-50',     icon: 'bg-orange-100 text-orange-600',   badge: 'text-orange-700' },
-  amber:   { card: 'border-amber-100 bg-amber-50/60 hover:bg-amber-50',        icon: 'bg-amber-100 text-amber-600',     badge: 'text-amber-700' },
-  violet:  { card: 'border-violet-100 bg-violet-50/60 hover:bg-violet-50',     icon: 'bg-violet-100 text-violet-600',   badge: 'text-violet-700' },
-  indigo:  { card: 'border-indigo-100 bg-indigo-50/60 hover:bg-indigo-50',     icon: 'bg-indigo-100 text-indigo-600',   badge: 'text-indigo-700' },
-  cyan:    { card: 'border-cyan-100 bg-cyan-50/60 hover:bg-cyan-50',           icon: 'bg-cyan-100 text-cyan-600',       badge: 'text-cyan-700' },
-  teal:    { card: 'border-teal-100 bg-teal-50/60 hover:bg-teal-50',           icon: 'bg-teal-100 text-teal-600',       badge: 'text-teal-700' },
-  sky:     { card: 'border-sky-100 bg-sky-50/60 hover:bg-sky-50',              icon: 'bg-sky-100 text-sky-600',         badge: 'text-sky-700' },
-  pink:    { card: 'border-pink-100 bg-pink-50/60 hover:bg-pink-50',           icon: 'bg-pink-100 text-pink-600',       badge: 'text-pink-700' },
-  green:   { card: 'border-green-100 bg-green-50/60 hover:bg-green-50',        icon: 'bg-green-100 text-green-600',     badge: 'text-green-700' },
+  emerald: { card: 'border-emerald-100 bg-emerald-50/60 hover:bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', badge: 'text-emerald-700' },
+  red: { card: 'border-red-100 bg-red-50/60 hover:bg-red-50', icon: 'bg-red-100 text-red-500', badge: 'text-red-600' },
+  orange: { card: 'border-orange-100 bg-orange-50/60 hover:bg-orange-50', icon: 'bg-orange-100 text-orange-600', badge: 'text-orange-700' },
+  amber: { card: 'border-amber-100 bg-amber-50/60 hover:bg-amber-50', icon: 'bg-amber-100 text-amber-600', badge: 'text-amber-700' },
+  violet: { card: 'border-violet-100 bg-violet-50/60 hover:bg-violet-50', icon: 'bg-violet-100 text-violet-600', badge: 'text-violet-700' },
+  indigo: { card: 'border-indigo-100 bg-indigo-50/60 hover:bg-indigo-50', icon: 'bg-indigo-100 text-indigo-600', badge: 'text-indigo-700' },
+  cyan: { card: 'border-cyan-100 bg-cyan-50/60 hover:bg-cyan-50', icon: 'bg-cyan-100 text-cyan-600', badge: 'text-cyan-700' },
+  teal: { card: 'border-teal-100 bg-teal-50/60 hover:bg-teal-50', icon: 'bg-teal-100 text-teal-600', badge: 'text-teal-700' },
+  sky: { card: 'border-sky-100 bg-sky-50/60 hover:bg-sky-50', icon: 'bg-sky-100 text-sky-600', badge: 'text-sky-700' },
+  pink: { card: 'border-pink-100 bg-pink-50/60 hover:bg-pink-50', icon: 'bg-pink-100 text-pink-600', badge: 'text-pink-700' },
+  green: { card: 'border-green-100 bg-green-50/60 hover:bg-green-50', icon: 'bg-green-100 text-green-600', badge: 'text-green-700' },
 };
 
 const colorMap: Record<string, { card: string; icon: string; badge: string }> = {
-  blue:    { card: 'border-green-100 bg-green-50/40',    icon: 'bg-green-100 text-green-600',     badge: 'bg-green-100 text-green-700' },
-  amber:   { card: 'border-amber-100 bg-amber-50/40',    icon: 'bg-amber-100 text-amber-600',     badge: 'bg-amber-100 text-amber-700' },
-  violet:  { card: 'border-violet-100 bg-violet-50/40',  icon: 'bg-violet-100 text-violet-600',   badge: 'bg-violet-100 text-violet-700' },
-  emerald: { card: 'border-emerald-100 bg-emerald-50/40',icon: 'bg-emerald-100 text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
+  blue: { card: 'border-green-100 bg-green-50/40', icon: 'bg-green-100 text-green-600', badge: 'bg-green-100 text-green-700' },
+  amber: { card: 'border-amber-100 bg-amber-50/40', icon: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700' },
+  violet: { card: 'border-violet-100 bg-violet-50/40', icon: 'bg-violet-100 text-violet-600', badge: 'bg-violet-100 text-violet-700' },
+  emerald: { card: 'border-emerald-100 bg-emerald-50/40', icon: 'bg-emerald-100 text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
 };
 
 const activityColors: Record<string, string> = {
-  call:   'bg-green-100 text-green-600',
+  call: 'bg-green-100 text-green-600',
   status: 'bg-violet-100 text-violet-600',
   resume: 'bg-emerald-100 text-emerald-600',
   walkin: 'bg-amber-100 text-amber-600',
@@ -91,10 +94,10 @@ const activityColors: Record<string, string> = {
 
 // ─── TL constants ──────────────────────────────────────────────────────────────
 const TL_STATUS_COLORS: Record<string, { dot: string; badge: string }> = {
-  online:    { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
-  break:     { dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700' },
-  offline:   { dot: 'bg-slate-300',   badge: 'bg-slate-100 text-slate-500' },
-  'on-target':{ dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
+  online: { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
+  break: { dot: 'bg-amber-500', badge: 'bg-amber-100 text-amber-700' },
+  offline: { dot: 'bg-slate-300', badge: 'bg-slate-100 text-slate-500' },
+  'on-target': { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
 };
 
 // ─── Manager constants ─────────────────────────────────────────────────────────
@@ -105,12 +108,12 @@ type DateRange = 'Day' | 'Week' | 'Quarter' | 'Year' | 'All' | 'Custom';
 type Tab = 'overview' | 'divisionDashboard' | 'recruiting' | 'team' | 'structure' | 'analytics' | 'businessDev';
 const DATE_TABS: DateRange[] = ['Day', 'Week', 'Quarter', 'Year', 'All', 'Custom'];
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'overview',   label: 'Overview' },
+  { id: 'overview', label: 'Overview' },
   { id: 'divisionDashboard', label: 'Division Dashboard' },
   { id: 'recruiting', label: 'Recruiting' },
-  { id: 'team',       label: 'Team' },
-  { id: 'structure',  label: 'Team Structure' },
-  { id: 'analytics',  label: 'Analytics' },
+  { id: 'team', label: 'Team' },
+  { id: 'structure', label: 'Team Structure' },
+  { id: 'analytics', label: 'Analytics' },
   { id: 'businessDev', label: 'Business Development' },
 ];
 
@@ -124,8 +127,8 @@ export function AdminDashboard() {
   const isFirstRender = useRef(true);
 
   // ── Overview state ──────────────────────────────────────────────────────────
-  const [sourceData, setSourceData]     = useState<any[]>([]);
-  const [alerts, setAlerts]             = useState<any[]>([]);
+  const [sourceData, setSourceData] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [adminMetrics, setAdminMetrics] = useState<any>({});
   const [revenueCandidates, setRevenueCandidates] = useState<any[]>([]);
   const [revenueSearch, setRevenueSearch] = useState('');
@@ -135,31 +138,38 @@ export function AdminDashboard() {
   const [activeDivision, setActiveDivision] = useState<'BPO' | 'IT' | 'Lateral'>('BPO');
   const [divisionData, setDivisionData] = useState<any>(null);
   const [divLoading, setDivLoading] = useState(false);
-  const [divTlFilter, setDivTlFilter] = useState('All TLs');
-  const [divRecruiterFilter, setDivRecruiterFilter] = useState('All Recruiters');
-  const [divCompanyFilter, setDivCompanyFilter] = useState('All Companies');
+  const [divCandidateSlicer, setDivCandidateSlicer] = useState<'all' | 'yetToJoin' | 'joined'>('all');
+  const [divCompanyFilter, setDivCompanyFilter] = useState<string>('All Companies');
+  const [divTlFilter, setDivTlFilter] = useState<string>('All Team Leaders');
+  const [divRecruiterFilter, setDivRecruiterFilter] = useState<string>('All Recruiters');
+  const [allClientNames, setAllClientNames] = useState<string[]>([]);
 
   // ── Recruiter state ─────────────────────────────────────────────────────────
-  const [dateRange, setDateRange]   = useState<DateRange>('Day');
+  const [dateRange, setDateRange] = useState<DateRange>('Day');
   const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo]     = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [recLoading, setRecLoading] = useState(false);
-  const [dashData, setDashData]     = useState<any>(null);
-  const [recDivision, setRecDivision] = useState<string>('All');
-  const [recruiterFilter, setRecruiterFilter] = useState<string>('');
-  const [recruitersList, setRecruitersList] = useState<any[]>([]);
+  const [dashData, setDashData] = useState<any>(null);
   const [analyticsDateRange, setAnalyticsDateRange] = useState<DateRange>('Month');
+  const [recDivision, setRecDivision] = useState<string>('All');
+  const [recruiterFilter, setRecruiterFilter] = useState<string>('All');
+  const [recruitersList, setRecruitersList] = useState<any[]>([]);
+  const [teamLeadersList, setTeamLeadersList] = useState<any[]>([]);
+  const [filteredRecruitersList, setFilteredRecruitersList] = useState<any[]>([]);
+  const [overviewSlicer, setOverviewSlicer] = useState<string>('All');
+  const [recruitingSlicer, setRecruitingSlicer] = useState<string>('All');
+  const [recCompanyFilter, setRecCompanyFilter] = useState<string>('All Companies');
 
   // ── TL state ────────────────────────────────────────────────────────────────
-  const [teams, setTeams]             = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [teamSummary, setTeamSummary] = useState<any>({ totalCalls: 0, totalInterviews: 0, totalFollowUps: 0, activeRecruiters: 0 });
 
   // ── Manager state ───────────────────────────────────────────────────────────
   const [conversionData, setConversionData] = useState<any[]>([]);
-  const [recruiterData, setRecruiterData]   = useState<any[]>([]);
-  const [mgrSourceData, setMgrSourceData]   = useState<any[]>([]);
-  const [revenueData, setRevenueData]       = useState<any[]>([]);
-  const [kpis, setKpis]                     = useState<any>({});
+  const [recruiterData, setRecruiterData] = useState<any[]>([]);
+  const [mgrSourceData, setMgrSourceData] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [kpis, setKpis] = useState<any>({});
 
   // ── Business Development state ──────────────────────────────────────────────
   const [bizDevRecords, setBizDevRecords] = useState<any[]>([]);
@@ -231,11 +241,11 @@ export function AdminDashboard() {
         status: r.onTarget ? 'on-target' : r.status || 'offline',
         joined: r.joined || r.loginTime || '—',
       }));
-      setTeams([{ tlName: 'Self', recruiters: mappedRecruiters, stats: { totalCalls: mappedRecruiters.reduce((s:any, r:any) => s + r.calls, 0) } }]);
+      setTeams([{ tlName: 'Self', recruiters: mappedRecruiters, stats: { totalCalls: mappedRecruiters.reduce((s: any, r: any) => s + r.calls, 0) } }]);
       setTeamSummary({
-        totalCalls: mappedRecruiters.reduce((s:any, r:any) => s+r.calls, 0),
-        totalInterviews: mappedRecruiters.reduce((s:any, r:any) => s+r.interviews, 0),
-        totalFollowUps: mappedRecruiters.reduce((s:any, r:any) => s+r.followUps, 0),
+        totalCalls: mappedRecruiters.reduce((s: any, r: any) => s + r.calls, 0),
+        totalInterviews: mappedRecruiters.reduce((s: any, r: any) => s + r.interviews, 0),
+        totalFollowUps: mappedRecruiters.reduce((s: any, r: any) => s + r.followUps, 0),
         activeRecruiters: mappedRecruiters.length
       });
     }
@@ -444,20 +454,19 @@ export function AdminDashboard() {
     const load = async () => {
       try {
         setLoading(true);
-        const [adminData, tlData, mgrData, recData, recruitersRes] = await Promise.all([
+        const [adminData, tlData, mgrData, recData] = await Promise.all([
           api.getAdminDashboard(),
           api.getAllTeamsDashboard(),
+
           api.getManagerDashboard(),
           api.getRecruiterDashboard({ range: 'day' }),
-          api.getRecruiters(),
         ]);
         const m = adminData.metrics || adminData.kpis || {};
         setAdminMetrics({ ...m, resumesReceived: m.resumesReceived ?? m.totalResumes ?? '—' });
         setSourceData(adminData.sourceChart || adminData.sourceData || adminData.resumeInflow || []);
         setAlerts((adminData.alerts || []).map((a: any) => ({ ...a, msg: a.msg || a.message || '' })));
-        setRecruitersList(recruitersRes || []);
-          setRevenueCandidates(adminData.revenueCandidates || []);
-          setTotalCandidateRevenue(adminData.totalRevenue || 0);
+        setRevenueCandidates(adminData.revenueCandidates || []);
+        setTotalCandidateRevenue(adminData.totalRevenue || 0);
         applyTLData(tlData);
         applyManagerData(mgrData);
         setDashData(recData);
@@ -470,6 +479,68 @@ export function AdminDashboard() {
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load recruiters and team leaders list for filter dropdowns
+  useEffect(() => {
+    Promise.all([
+      api.getRecruiters().catch(() => []),
+      api.getUsers({ limit: '1000' }).catch(() => ({ users: [] }))
+    ]).then(([recRes, userRes]: any) => {
+      const recs = Array.isArray(recRes) ? recRes : (recRes?.users || []);
+      setRecruitersList(recs);
+
+      const allUsers = Array.isArray(userRes) ? userRes : (userRes?.users || []);
+      // Team Leaders: users with role 'tl', 'manager', or 'admin'
+      const tls = allUsers.filter((u: any) => ['tl', 'manager', 'admin'].includes(u.role) && u.status !== 'Inactive');
+      setTeamLeadersList(tls.length > 0 ? tls : allUsers);
+    }).catch(err => console.error('Failed to load team leaders list:', err));
+  }, []);
+
+  // Cascade Recruiter dropdown based on selected Team Leader
+  useEffect(() => {
+    if (!divTlFilter || divTlFilter === 'All Team Leaders') {
+      setFilteredRecruitersList(recruitersList);
+    } else {
+      const selectedTlObj = teamLeadersList.find(t => (t._id || t.id || t.name) === divTlFilter);
+      const tlIdParam = selectedTlObj?._id || selectedTlObj?.id || divTlFilter;
+      api.getTeamMembers(tlIdParam)
+        .then((res: any) => {
+          const members = res?.members || res?.data || (Array.isArray(res) ? res : []);
+          setFilteredRecruitersList(members.length > 0 ? members : recruitersList);
+        })
+        .catch(() => {
+          setFilteredRecruitersList(recruitersList);
+        });
+    }
+  }, [divTlFilter, recruitersList, teamLeadersList]);
+
+  // ── Admin date-filter refresh ───────────────────────────────────────────────
+  useEffect(() => {
+    if (dateRange === 'Custom' && (!customFrom || !customTo)) return;
+    const loadAdminData = async () => {
+      try {
+        const params: Record<string, string> = { range: dateRange.toLowerCase() };
+        if (dateRange === 'Custom') {
+          params.from = customFrom;
+          params.to = customTo;
+        }
+        const adminData = await api.getAdminDashboard(params);
+        const m = adminData.metrics || adminData.kpis || {};
+        setAdminMetrics({ ...m, resumesReceived: m.resumesReceived ?? m.totalResumes ?? '—' });
+        setSourceData(adminData.sourceChart || adminData.sourceData || adminData.resumeInflow || []);
+        if (adminData.alerts) {
+          setAlerts((adminData.alerts || []).map((a: any) => ({ ...a, msg: a.msg || a.message || '' })));
+        }
+        if (adminData.revenueCandidates) {
+          setRevenueCandidates(adminData.revenueCandidates);
+          setTotalCandidateRevenue(adminData.totalRevenue || 0);
+        }
+      } catch (err) {
+        console.error('Failed to update admin dashboard for date range:', err);
+      }
+    };
+    loadAdminData();
+  }, [dateRange, customFrom, customTo]);
+
   // ── Recruiter date-filter refresh (skip first render) ───────────────────────
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
@@ -479,8 +550,8 @@ export function AdminDashboard() {
         setRecLoading(true);
         const params: Record<string, string> = { range: dateRange.toLowerCase() };
         if (dateRange === 'Custom') { params.from = customFrom; params.to = customTo; }
-        if (recDivision !== 'All') { params.division = recDivision; }
-        if (recruiterFilter) { params.recruiter = recruiterFilter; }
+        if (recDivision && recDivision !== 'All') params.division = recDivision;
+        if (recruiterFilter && recruiterFilter !== 'All') params.recruiter = recruiterFilter;
         const data = await api.getRecruiterDashboard(params);
         setDashData(data);
       } catch (err) {
@@ -493,12 +564,21 @@ export function AdminDashboard() {
   }, [dateRange, customFrom, customTo, recDivision, recruiterFilter]);
 
   // ── Division Dashboard loader ───────────────────────────────────────────────
+  // Load ONLY created companies from Company Management (deduplicated & sorted A-Z)
+  useEffect(() => {
+    api.getCompanyList().then((data: any) => {
+      const raw = Array.isArray(data) ? data : (data.companies || []);
+      const uniqueSorted = dedupeCompanies(raw).map((c: any) => typeof c === 'string' ? c : c.companyName || c.name || '').filter(Boolean);
+      setAllClientNames(uniqueSorted as string[]);
+    }).catch(() => { });
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'divisionDashboard') {
       const loadDiv = async () => {
         try {
           setDivLoading(true);
-          const data = await api.getDivisionDashboard(activeDivision);
+          const data = await api.getDivisionDashboard(activeDivision, divCompanyFilter, divTlFilter, divRecruiterFilter);
           setDivisionData(data);
         } catch (err) {
           console.error('Failed to load division dashboard:', err);
@@ -508,34 +588,34 @@ export function AdminDashboard() {
       };
       loadDiv();
     }
-  }, [activeTab, activeDivision]);
+  }, [activeTab, activeDivision, divCompanyFilter, divTlFilter, divRecruiterFilter]);
 
   // ── Derived values ───────────────────────────────────────────────────────────
   const STATUS_CARDS = dashData?.pipeline
     ? Object.entries(dashData.pipeline).map(([label, count]: any, i: number) => ({
-        label, count: count || 0,
-        color: STATUS_COLOR_LIST[i % STATUS_COLOR_LIST.length],
-        icon: STATUS_ICON_MAP[label] || UserCheck,
-      }))
+      label, count: count || 0,
+      color: STATUS_COLOR_LIST[i % STATUS_COLOR_LIST.length],
+      icon: STATUS_ICON_MAP[label] || UserCheck,
+    }))
     : [];
 
-  const followUps      = dashData?.followUps || [];
+  const followUps = dashData?.followUps || [];
   const recentActivity = dashData?.recentActivity || [];
   const recMetrics = {
-    todayCalls:          dashData?.metrics?.todayCalls ?? dashData?.todayCalls ?? 0,
-    followUpsDue:        dashData?.metrics?.followUpsDue ?? dashData?.followUpsDue ?? (dashData?.followUps?.length || 0),
+    todayCalls: dashData?.metrics?.todayCalls ?? dashData?.todayCalls ?? 0,
+    followUpsDue: dashData?.metrics?.followUpsDue ?? dashData?.followUpsDue ?? (dashData?.followUps?.length || 0),
     interviewsScheduled: dashData?.metrics?.scheduledInterviews ?? dashData?.interviewsScheduled ?? 0,
-    resumeInflow:        dashData?.metrics?.totalCandidates ?? dashData?.resumeInflow ?? 0,
-    dailyTarget:         dashData?.callTarget?.target ?? dashData?.dailyTarget ?? 50,
+    resumeInflow: dashData?.metrics?.totalCandidates ?? dashData?.resumeInflow ?? 0,
+    dailyTarget: dashData?.callTarget?.target ?? dashData?.dailyTarget ?? 50,
   };
 
-  const totalCalls      = teamSummary.totalCalls || 0;
+  const totalCalls = teamSummary.totalCalls || 0;
   const totalInterviews = teamSummary.totalInterviews || 0;
-  const totalFollowUps  = teamSummary.totalFollowUps || 0;
+  const totalFollowUps = teamSummary.totalFollowUps || 0;
 
-  const goToStatus    = (status: string) => navigate('/admin/candidates', { state: { statusFilter: status } });
+  const goToStatus = (status: string) => navigate('/admin/candidates', { state: { statusFilter: status } });
   const goToTodayCalls = () => navigate('/recruiter/resumes', { state: { todayCalls: true } });
-  const goToSource     = (source: string) => navigate('/admin/candidates', { state: { sourceFilter: source } });
+  const goToSource = (source: string) => navigate('/admin/candidates', { state: { sourceFilter: source } });
 
   // ── Sticky Notes ───────────────────────────────────────────────────────────
   const [notesOpen, setNotesOpen] = useState(false);
@@ -607,17 +687,62 @@ export function AdminDashboard() {
         </span>
       </div>
 
-      {/* Tab Bar */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`px-5 py-2 rounded-lg text-sm transition-all ${
-              activeTab === tab.id ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-            style={{ fontWeight: activeTab === tab.id ? 600 : 400 }}>
-            {tab.label}
-          </button>
-        ))}
+      {/* Tab Bar & Date Range Controls */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-100 shadow-xs">
+        {/* Tab Bar */}
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl flex-wrap">
+          {TABS.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-lg text-xs sm:text-sm transition-all ${activeTab === tab.id ? 'bg-white text-slate-800 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Global Date Range Filter Pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Date Range:</span>
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            {DATE_TABS.map(r => (
+              <button
+                key={r}
+                onClick={() => setDateRange(r)}
+                className={`px-3 py-1.5 rounded-lg transition-all ${dateRange === r ? 'bg-green-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          {dateRange === 'Custom' && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={e => setCustomFrom(e.target.value)}
+                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-500 bg-white"
+              />
+              <span className="text-xs text-slate-400">to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={e => setCustomTo(e.target.value)}
+                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-500 bg-white"
+              />
+              {(customFrom || customTo) && (
+                <button
+                  onClick={() => { setCustomFrom(''); setCustomTo(''); }}
+                  className="p-1 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ══════════════ TAB: OVERVIEW ══════════════ */}
@@ -635,7 +760,7 @@ export function AdminDashboard() {
                 { label: 'Operations Round', value: adminMetrics.opsRoundCount ?? adminMetrics.operationsRoundCount ?? '0', sub: 'In Ops Round', icon: Building2, color: 'violet', href: '/admin/candidates?statusFilter=Operations%20Round' },
                 { label: 'HR Round', value: adminMetrics.hrRoundCount ?? '0', sub: 'In HR Round', icon: ClipboardList, color: 'amber', href: '/admin/candidates?statusFilter=HR%20Shortlist' },
                 { label: 'Yet to Join', value: adminMetrics.yetToJoinCount ?? adminMetrics.followToJoinCount ?? '0', sub: 'Offer Accepted', icon: UserCheck, color: 'purple', href: '/admin/candidates?statusFilter=Yet%20To%20Join' },
-                { label: 'Joined', value: adminMetrics.joinedCount ?? adminMetrics.joined ?? '0', sub: 'Successfully Placed', icon: CheckCircle2, color: 'green', href: '/admin/candidates?statusFilter=Joined' },
+                { label: 'Joined', value: adminMetrics.joinedCount ?? '0', sub: 'Successfully Placed', icon: CheckCircle2, color: 'green', href: '/admin/candidates?statusFilter=Joined' },
               ].map((m, i) => {
                 const Icon = m.icon;
                 const bg: Record<string, string> = {
@@ -773,11 +898,11 @@ export function AdminDashboard() {
           {/* Quick Nav */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {[
-              { label: 'Attendance',      href: '/admin/attendance', icon: Clock,      desc: 'Login/logout & WFH',        color: 'blue' },
-              { label: 'User Management', href: '/admin/users',      icon: UserCog,    desc: 'Add, edit & manage users',  color: 'violet' },
-              { label: 'Access Control',  href: '/admin/access',     icon: Shield,     desc: 'Roles & permissions',       color: 'violet' },
-              { label: 'System Logs',     href: '/admin/logs',       icon: Activity,   desc: 'Activity & audit trail',    color: 'emerald' },
-              { label: 'Revenue',         href: '/revenue',          icon: TrendingUp, desc: 'Revenue & invoices',        color: 'amber' },
+              { label: 'Attendance', href: '/admin/attendance', icon: Clock, desc: 'Login/logout & WFH', color: 'blue' },
+              { label: 'User Management', href: '/admin/users', icon: UserCog, desc: 'Add, edit & manage users', color: 'violet' },
+              { label: 'Access Control', href: '/admin/access', icon: Shield, desc: 'Roles & permissions', color: 'violet' },
+              { label: 'System Logs', href: '/admin/logs', icon: Activity, desc: 'Activity & audit trail', color: 'emerald' },
+              { label: 'Revenue', href: '/revenue', icon: TrendingUp, desc: 'Revenue & invoices', color: 'amber' },
             ].map((n, i) => {
               const Icon = n.icon;
               const bg: Record<string, string> = {
@@ -799,11 +924,11 @@ export function AdminDashboard() {
           {/* Admin Shortcuts: New Modules */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {[
-              { label: 'Job Requirements', href: '/admin/jobs',         icon: Briefcase,       desc: 'Manage JRs & job openings',   color: 'bg-teal-50 text-teal-600 border-teal-100' },
-              { label: 'Companies',        href: '/admin/companies',    icon: Building2,       desc: 'Company profiles & tracking', color: 'bg-sky-50 text-sky-600 border-sky-100' },
-              { label: 'Candidate DB',     href: '/admin/candidates',   icon: Database,        desc: 'Full candidate database',     color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
-              { label: 'Team Tasks',       href: '/admin/tasks',        icon: CheckSquare,     desc: 'Assign & track daily tasks',  color: 'bg-rose-50 text-rose-600 border-rose-100' },
-              { label: 'ATS Records',      href: '/admin/ats-records',  icon: FileSpreadsheet, desc: 'Scanned resumes & Excel export', color: 'bg-green-50 text-green-600 border-green-100' },
+              { label: 'Job Requirements', href: '/admin/jobs', icon: Briefcase, desc: 'Manage JRs & job openings', color: 'bg-teal-50 text-teal-600 border-teal-100' },
+              { label: 'Companies', href: '/admin/companies', icon: Building2, desc: 'Company profiles & tracking', color: 'bg-sky-50 text-sky-600 border-sky-100' },
+              { label: 'Candidate DB', href: '/admin/candidates', icon: Database, desc: 'Full candidate database', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+              { label: 'Team Tasks', href: '/admin/tasks', icon: CheckSquare, desc: 'Assign & track daily tasks', color: 'bg-rose-50 text-rose-600 border-rose-100' },
+              { label: 'ATS Records', href: '/admin/ats-records', icon: FileSpreadsheet, desc: 'Scanned resumes & Excel export', color: 'bg-green-50 text-green-600 border-green-100' },
             ].map((n, i) => {
               const Icon = n.icon;
               return (
@@ -827,18 +952,73 @@ export function AdminDashboard() {
               <h2 className="text-slate-800 text-base" style={{ fontWeight: 700 }}>Division Overview</h2>
               <p className="text-slate-500 text-xs mt-0.5">Filter dashboard and onboarding metrics by division</p>
             </div>
-            <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl">
-              {(['BPO', 'IT', 'Lateral'] as const).map(div => (
-                <button
-                  key={div}
-                  onClick={() => setActiveDivision(div)}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                    activeDivision === div ? 'bg-green-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                  }`}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Team Leader Filter (Req 27) */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Team Leader</label>
+                <select
+                  value={divTlFilter}
+                  onChange={e => {
+                    setDivTlFilter(e.target.value);
+                    setDivRecruiterFilter('All Recruiters');
+                  }}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-44 font-semibold"
                 >
-                  {div} Division
-                </button>
-              ))}
+                  <option value="All Team Leaders">All Team Leaders</option>
+                  {teamLeadersList.map(tl => (
+                    <option key={tl._id || tl.id || tl.name} value={tl._id || tl.id || tl.name}>
+                      {tl.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Recruiter Filter (Cascaded under Team Leader) */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Recruiter</label>
+                <select
+                  value={divRecruiterFilter}
+                  onChange={e => setDivRecruiterFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-44 font-semibold"
+                >
+                  <option value="All Recruiters">All Recruiters</option>
+                  {filteredRecruitersList.map(r => (
+                    <option key={r._id || r.id || r.name} value={r._id || r.id || r.name}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Company Filter */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Company</label>
+                <select
+                  value={divCompanyFilter}
+                  onChange={e => setDivCompanyFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 min-w-44"
+                >
+                  <option value="All Companies">All Companies</option>
+                  {allClientNames.map(comp => (
+                    <option key={comp} value={comp}>{comp}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Division Pills */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1" style={{ fontWeight: 500 }}>Division</label>
+                <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl">
+                  {(['BPO', 'IT', 'Lateral'] as const).map(div => (
+                    <button
+                      key={div}
+                      onClick={() => { setActiveDivision(div); setDivCompanyFilter('All Companies'); }}
+                      className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDivision === div ? 'bg-green-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                        }`}
+                    >
+                      {div} Division
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -851,65 +1031,196 @@ export function AdminDashboard() {
           ) : (
             <>
               {/* Summary Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
                 {[
                   { label: 'Active JRs', value: divisionData.totalJRs, color: 'text-blue-600', bg: 'bg-blue-50', link: `/admin/jobs?division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&company=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Open Positions', value: divisionData.openPositions, color: 'text-indigo-600', bg: 'bg-indigo-50', link: `/admin/jobs?division=${activeDivision}&status=Open&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&company=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Screening Round', value: divisionData.pipeline?.screening || 0, color: 'text-amber-600', bg: 'bg-amber-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Eligible,Screening,Shortlisted,Submitted to Client,Submitted To Client,Sublitted To Client,Walkin Company,Walkin WHM,Call Back,Hold,No Response,Duplicate-Client,Walk-in Submitted,Contacted,Interested,Selected for Call,New,HR Shortlist')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
-                  { label: 'Interview Stage', value: divisionData.pipeline?.interview || 0, color: 'text-violet-600', bg: 'bg-violet-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Interview Scheduled,Interview Rescheduled,Interview Completed,Interview,Selected for Interview,Written Test,Operations Round,Interview Feedback Pending,Test Select,Test Reject')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
-                  { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,L2 Select,Final Select,VNA Select,Client Select')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Interview Stage', value: divisionData.pipeline?.interview || 0, color: 'text-violet-600', bg: 'bg-violet-50', link: `/admin/candidates?statusIn=${encodeURIComponent('VNA Select,Test Select,L1 Select,L2 Select,Final Select,Interview Scheduled,Interview Rescheduled,Interview Completed,Interview,Selected for Interview,Written Test,Operations Round,Interview Feedback Pending')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
+                  { label: 'Offered / Selected', value: divisionData.pipeline?.offer || 0, color: 'text-pink-600', bg: 'bg-pink-50', link: `/admin/candidates?statusIn=${encodeURIComponent('Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,Client Select,Final Select')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Yet To Join', value: divisionData.pipeline?.yetToJoin || 0, color: 'text-purple-600', bg: 'bg-purple-50', slicerKey: 'yetToJoin', link: `/admin/candidates?statusIn=${encodeURIComponent('Yet To Join,Joining Date Confirmed,Joining Postponed')}&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                   { label: 'Joined Candidates', value: divisionData.pipeline?.joined || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', slicerKey: 'joined', link: `/admin/candidates?statusFilter=Joined&division=${activeDivision}&tlId=${encodeURIComponent(divTlFilter)}&recruiter=${encodeURIComponent(divRecruiterFilter)}${divCompanyFilter && divCompanyFilter !== 'All Companies' ? `&clientName=${encodeURIComponent(divCompanyFilter)}` : ''}` },
                 ].map((s, i) => (
-                  <button key={i} onClick={() => navigate(s.link)} className={`${s.bg} rounded-2xl p-4 border border-slate-100 shadow-sm text-center hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer w-full`}>
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (s.slicerKey) {
+                        setDivCandidateSlicer(s.slicerKey as any);
+                      } else {
+                        navigate(s.link);
+                      }
+                    }}
+                    className={`${s.bg} rounded-2xl p-4 border border-slate-100 shadow-sm text-center hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer w-full ${s.slicerKey && divCandidateSlicer === s.slicerKey ? 'ring-2 ring-purple-500/50 shadow-md' : ''
+                      }`}
+                  >
                     <div className={`text-2xl ${s.color}`} style={{ fontWeight: 700 }}>{s.value}</div>
                     <div className="text-slate-500 text-xs mt-0.5" style={{ fontWeight: 500 }}>{s.label}</div>
                   </button>
                 ))}
               </div>
 
-              {/* Joined Candidates Table */}
-              <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
-                  <h3 className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Onboarded / Joined Candidates — {activeDivision}</h3>
-                  <span className="text-xs text-green-600 font-semibold px-2.5 py-1 bg-green-50 rounded-full">
-                    {divisionData.joinedCandidates?.length || 0} Joined
-                  </span>
+              {/* Interactive Candidate Slicer & Tables */}
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden space-y-0">
+                {/* Slicer Navigation Bar */}
+                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-slate-800 text-sm font-bold flex items-center gap-2">
+                      <span>Candidate Onboarding Breakdown — {activeDivision}</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Filter candidate lists by onboarding and joining status</p>
+                  </div>
+
+                  {/* Interactive Slicer Pills */}
+                  <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                    <button
+                      onClick={() => setDivCandidateSlicer('all')}
+                      className={`px-3 py-1.5 rounded-lg transition-all ${divCandidateSlicer === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                      All Candidates ({(
+                        [...(divisionData.yetToJoinCandidates || []), ...(divisionData.joinedCandidates || [])]
+                          .filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length
+                      )})
+                    </button>
+                    <button
+                      onClick={() => setDivCandidateSlicer('yetToJoin')}
+                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${divCandidateSlicer === 'yetToJoin' ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-700 hover:bg-purple-50'
+                        }`}
+                    >
+                      <span>Yet To Join</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${divCandidateSlicer === 'yetToJoin' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-800'}`}>
+                        {(divisionData.yetToJoinCandidates || []).filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setDivCandidateSlicer('joined')}
+                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${divCandidateSlicer === 'joined' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-700 hover:bg-emerald-50'
+                        }`}
+                    >
+                      <span>Joined</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${divCandidateSlicer === 'joined' ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+                        {(divisionData.joinedCandidates || []).filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length}
+                      </span>
+                    </button>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100 text-left text-xs text-slate-500 uppercase tracking-wide">
-                        <th className="px-5 py-3 font-semibold">Candidate Name</th>
-                        <th className="px-5 py-3 font-semibold">Position Applied</th>
-                        <th className="px-5 py-3 font-semibold">Company / Client</th>
-                        <th className="px-5 py-3 font-semibold">Recruiter</th>
-                        <th className="px-5 py-3 font-semibold">Date of Joining</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 text-slate-700">
-                      {(!divisionData.joinedCandidates || divisionData.joinedCandidates.length === 0) ? (
-                        <tr>
-                          <td colSpan={5} className="text-center py-10 text-slate-400 text-sm">
-                            No candidates joined under {activeDivision} division yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        divisionData.joinedCandidates.map((c: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="px-5 py-3 font-medium text-slate-900">{c.name}</td>
-                            <td className="px-5 py-3">{c.positionApplied || '—'}</td>
-                            <td className="px-5 py-3 font-medium text-blue-600">{c.clientName || '—'}</td>
-                            <td className="px-5 py-3 text-slate-500 text-xs">{c.assignedRecruiterName || '—'}</td>
-                            <td className="px-5 py-3 text-emerald-600 font-semibold whitespace-nowrap">
-                              {c.dateOfJoining ? new Date(c.dateOfJoining).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                            </td>
+
+                {/* Candidate Table Render */}
+                {(divCandidateSlicer === 'yetToJoin' || divCandidateSlicer === 'all') && (
+                  <div className="border-b border-slate-100 last:border-b-0">
+                    <div className="bg-purple-50/50 px-5 py-2.5 border-b border-purple-100/50 flex justify-between items-center">
+                      <span className="text-xs font-bold text-purple-900 uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                        Yet To Join Candidates ({(divisionData.yetToJoinCandidates || []).filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length})
+                        {divCompanyFilter !== 'All Companies' && <span className="text-purple-500 font-normal normal-case">· {divCompanyFilter}</span>}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 text-left text-xs text-slate-500 uppercase tracking-wide">
+                            <th className="px-5 py-3 font-semibold">Candidate Name</th>
+                            <th className="px-5 py-3 font-semibold">Position Applied</th>
+                            <th className="px-5 py-3 font-semibold">Company / Client</th>
+                            <th className="px-5 py-3 font-semibold">Recruiter</th>
+                            <th className="px-5 py-3 font-semibold">Expected Joining Date</th>
+                            <th className="px-5 py-3 font-semibold">Status</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 text-slate-700">
+                          {(() => {
+                            const rows = (divisionData.yetToJoinCandidates || []).filter((c: any) =>
+                              divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter
+                            );
+                            if (rows.length === 0) return (
+                              <tr>
+                                <td colSpan={6} className="text-center py-8 text-slate-400 text-sm">
+                                  {divCompanyFilter !== 'All Companies'
+                                    ? `No 'Yet To Join' candidates for ${divCompanyFilter} under ${activeDivision}.`
+                                    : `No candidates marked 'Yet To Join' under ${activeDivision} division.`}
+                                </td>
+                              </tr>
+                            );
+                            return rows.map((c: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-5 py-3 font-medium text-slate-900">{c.name}</td>
+                                <td className="px-5 py-3">{c.positionApplied || '—'}</td>
+                                <td className="px-5 py-3 font-medium text-blue-600">{c.clientName || '—'}</td>
+                                <td className="px-5 py-3 text-slate-500 text-xs">{c.assignedRecruiterName || '—'}</td>
+                                <td className="px-5 py-3 text-purple-700 font-semibold whitespace-nowrap">
+                                  {c.dateOfJoining || c.expectedDateOfJoining ? new Date(c.dateOfJoining || c.expectedDateOfJoining).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pending Confirmation'}
+                                </td>
+                                <td className="px-5 py-3">
+                                  <span className="px-2.5 py-1 text-xs font-semibold bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                                    {c.status || c.candidateStatusPostOffer || 'Yet To Join'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {(divCandidateSlicer === 'joined' || divCandidateSlicer === 'all') && (
+                  <div>
+                    <div className="bg-emerald-50/50 px-5 py-2.5 border-b border-emerald-100/50 flex justify-between items-center">
+                      <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                        Onboarded / Joined Candidates ({(divisionData.joinedCandidates || []).filter((c: any) => divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter).length})
+                        {divCompanyFilter !== 'All Companies' && <span className="text-emerald-500 font-normal normal-case">· {divCompanyFilter}</span>}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 text-left text-xs text-slate-500 uppercase tracking-wide">
+                            <th className="px-5 py-3 font-semibold">Candidate Name</th>
+                            <th className="px-5 py-3 font-semibold">Position Applied</th>
+                            <th className="px-5 py-3 font-semibold">Company / Client</th>
+                            <th className="px-5 py-3 font-semibold">Recruiter</th>
+                            <th className="px-5 py-3 font-semibold">Date of Joining</th>
+                            <th className="px-5 py-3 font-semibold">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 text-slate-700">
+                          {(() => {
+                            const rows = (divisionData.joinedCandidates || []).filter((c: any) =>
+                              divCompanyFilter === 'All Companies' || c.clientName === divCompanyFilter
+                            );
+                            if (rows.length === 0) return (
+                              <tr>
+                                <td colSpan={6} className="text-center py-8 text-slate-400 text-sm">
+                                  {divCompanyFilter !== 'All Companies'
+                                    ? `No joined candidates for ${divCompanyFilter} under ${activeDivision}.`
+                                    : `No candidates joined under ${activeDivision} division yet.`}
+                                </td>
+                              </tr>
+                            );
+                            return rows.map((c: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-5 py-3 font-medium text-slate-900">{c.name}</td>
+                                <td className="px-5 py-3">{c.positionApplied || '—'}</td>
+                                <td className="px-5 py-3 font-medium text-blue-600">{c.clientName || '—'}</td>
+                                <td className="px-5 py-3 text-slate-500 text-xs">{c.assignedRecruiterName || '—'}</td>
+                                <td className="px-5 py-3 text-emerald-600 font-semibold whitespace-nowrap">
+                                  {c.dateOfJoining ? new Date(c.dateOfJoining).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                </td>
+                                <td className="px-5 py-3">
+                                  <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200">
+                                    {c.status || 'Joined'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -919,70 +1230,97 @@ export function AdminDashboard() {
       {/* ══════════════ TAB: RECRUITING ══════════════ */}
       {activeTab === 'recruiting' && (
         <>
-          {/* Date Filter Bar */}
-          <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-400 mr-1" style={{ fontWeight: 600 }}>FILTER BY:</span>
-              <div className="flex gap-1 flex-wrap">
-                {DATE_TABS.map(tab => (
-                  <button key={tab} onClick={() => setDateRange(tab)}
-                    className={`px-4 py-1.5 rounded-lg text-xs transition-colors ${
-                      dateRange === tab ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                    style={{ fontWeight: dateRange === tab ? 600 : 500 }}>{tab}</button>
-                ))}
-              </div>
+          {/* Filter Bar: Date, Division, Company & Recruiter */}
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+            <div className="flex items-center flex-wrap gap-4">
 
-              {/* Division Filter Pills */}
-              <div className="flex gap-1 bg-slate-100 p-1 rounded-xl ml-2">
-                {['All', 'IT', 'BPO', 'Lateral'].map(div => (
-                  <button
-                    key={div}
-                    onClick={() => setRecDivision(div)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                      recDivision === div ? 'bg-green-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
-                    }`}
-                  >
-                    {div}
-                  </button>
-                ))}
-              </div>
-
-              {/* Recruiter Dropdown Filter */}
-              <div className="ml-2 flex items-center">
+              {/* Date Filter – dropdown */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">DATE:</span>
                 <select
-                  value={recruiterFilter}
-                  onChange={(e) => setRecruiterFilter(e.target.value)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none bg-white text-slate-700 hover:border-slate-300 transition-colors"
-                  style={{ fontWeight: 500 }}
+                  value={dateRange}
+                  onChange={e => setDateRange(e.target.value as DateRange)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 font-medium focus:border-green-400 min-w-32"
                 >
-                  <option value="">All Recruiters</option>
-                  {recruitersList.map(r => (
-                    <option key={r._id} value={r._id}>{r.name}</option>
+                  {DATE_TABS.map(tab => (
+                    <option key={tab} value={tab}>{tab}</option>
+                  ))}
+                </select>
+                {dateRange === 'Custom' && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-400">From</span>
+                      <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-400">To</span>
+                      <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white" />
+                    </div>
+                    {(customFrom || customTo) && (
+                      <button onClick={() => { setCustomFrom(''); setCustomTo(''); }}
+                        className="p-1.5 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
+              {/* Division Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">DIVISION:</span>
+                <div className="flex gap-1 bg-slate-100 p-1 rounded-lg text-xs">
+                  {['All', 'BPO', 'IT', 'Lateral'].map(div => (
+                    <button
+                      key={div}
+                      onClick={() => setRecDivision(div)}
+                      className={`px-3 py-1 rounded-md font-semibold transition-all ${recDivision === div ? 'bg-green-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                      {div}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Company Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">COMPANY:</span>
+                <select
+                  value={recCompanyFilter}
+                  onChange={e => setRecCompanyFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white text-slate-700 font-medium focus:border-green-400 min-w-44"
+                >
+                  <option value="All Companies">All Companies</option>
+                  {allClientNames.map(comp => (
+                    <option key={comp} value={comp}>{comp}</option>
                   ))}
                 </select>
               </div>
 
-              {dateRange === 'Custom' && (
-                <div className="flex items-center gap-2 ml-2 flex-wrap">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-slate-400">From</span>
-                    <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                      className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white" />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-slate-400">To</span>
-                    <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                      className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:border-green-400 bg-white" />
-                  </div>
-                  {(customFrom || customTo) && (
-                    <button onClick={() => { setCustomFrom(''); setCustomTo(''); }}
-                      className="p-1.5 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
-                  )}
-                </div>
-              )}
+              {/* Recruiter Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">RECRUITER:</span>
+                <select
+                  value={recruiterFilter}
+                  onChange={e => setRecruiterFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:border-green-500 bg-white cursor-pointer"
+                >
+                  <option value="All">All Recruiters</option>
+                  {recruitersList.map(r => (
+                    <option key={r._id || r.id} value={r._id || r.id}>
+                      {r.name} ({r.role || 'Recruiter'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
             </div>
           </div>
+
 
           {recLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -993,10 +1331,10 @@ export function AdminDashboard() {
               {/* Top 4 Metrics */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Today's Calls",       value: String(recMetrics.todayCalls),          change: `+${recMetrics.todayCalls}`,          color: 'blue',    icon: Phone,         clickable: true },
-                  { label: 'Follow-Ups Due',       value: String(recMetrics.followUpsDue),        change: 'Urgent',                            color: 'amber',   icon: AlertCircle,   clickable: false },
-                  { label: 'Interviews Scheduled', value: String(recMetrics.interviewsScheduled), change: 'This week',                         color: 'violet',  icon: Calendar,      clickable: false },
-                  { label: 'Resume Inflow',        value: String(recMetrics.resumeInflow),        change: `+${recMetrics.resumeInflow} today`, color: 'emerald', icon: FileText,      clickable: false },
+                  { label: "Today's Calls", value: String(recMetrics.todayCalls), change: `+${recMetrics.todayCalls}`, color: 'blue', icon: Phone, clickable: true },
+                  { label: 'Follow-Ups Due', value: String(recMetrics.followUpsDue), change: 'Urgent', color: 'amber', icon: AlertCircle, clickable: false },
+                  { label: 'Interviews Scheduled', value: String(recMetrics.interviewsScheduled), change: 'This week', color: 'violet', icon: Calendar, clickable: false },
+                  { label: 'Resume Inflow', value: String(recMetrics.resumeInflow), change: `+${recMetrics.resumeInflow} today`, color: 'emerald', icon: FileText, clickable: false },
                 ].map((m, i) => {
                   const Icon = m.icon;
                   const c = colorMap[m.color];
@@ -1036,9 +1374,11 @@ export function AdminDashboard() {
                   {STATUS_CARDS.map((s, i) => {
                     const Icon = s.icon;
                     const c = STATUS_COLOR_MAP[s.color];
+                    const isSelected = recruitingSlicer === s.label;
                     return (
-                      <button key={i} onClick={() => goToStatus(s.label)}
-                        className={`flex flex-col items-start p-3.5 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${c.card}`}>
+                      <button key={i} onClick={() => setRecruitingSlicer(isSelected ? 'All' : s.label)}
+                        className={`flex flex-col items-start p-3.5 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${c.card} ${isSelected ? 'ring-2 ring-green-600 shadow-md scale-102 border-green-400' : ''
+                          }`}>
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2.5 ${c.icon}`}><Icon className="w-4 h-4" /></div>
                         <div className={`text-xl mb-0.5 ${c.badge}`} style={{ fontWeight: 800, lineHeight: 1 }}>{s.count}</div>
                         <div className="text-slate-500 text-xs leading-tight">{s.label}</div>
@@ -1047,6 +1387,18 @@ export function AdminDashboard() {
                   })}
                 </div>
               </div>
+
+              {/* In-Place Slicer Filtered Data Table for Recruiting Tab */}
+              <SlicerFilteredDataView
+                slicerName={recruitingSlicer}
+                division={recDivision}
+                recruiter={recruiterFilter}
+                range={dateRange}
+                fromDate={customFrom}
+                toDate={customTo}
+                onClear={() => setRecruitingSlicer('All')}
+                title="Recruiting Pipeline Slicer"
+              />
 
               {/* Follow-Ups + Quick Actions */}
               <div className="grid lg:grid-cols-3 gap-6">
@@ -1093,14 +1445,14 @@ export function AdminDashboard() {
                     <h2 className="text-slate-800 text-sm mb-4" style={{ fontWeight: 600 }}>Quick Actions</h2>
                     <div className="space-y-2">
                       {[
-                        { label: 'Add New Candidate',  href: '/recruiter/add',          icon: UserPlus,     color: 'text-green-600' },
-                        { label: 'Create Job (JR)',     href: '/recruiter/jobs/new',     icon: Briefcase,    color: 'text-teal-600' },
-                        { label: 'Joining Form',        href: '/recruiter/joining',      icon: FileCheck,    color: 'text-emerald-600' },
-                        { label: 'Walk-In Queue',       href: '/recruiter/walkin-queue', icon: ListChecks,   color: 'text-emerald-600' },
-                        { label: 'Interview Schedule',  href: '/recruiter/interviews',   icon: CalendarCheck,color: 'text-violet-600' },
-                        { label: 'ATS Resume Scanner',  href: '/recruiter/scan',         icon: ScanLine,     color: 'text-amber-600' },
-                        { label: 'Send Mail',           href: '/email-center',           icon: Mail,         color: 'text-blue-600' },
-                        { label: 'View All Resumes',    href: '/recruiter/resumes',      icon: FileText,     color: 'text-slate-600' },
+                        { label: 'Add New Candidate', href: '/recruiter/add', icon: UserPlus, color: 'text-green-600' },
+                        { label: 'Create Job (JR)', href: '/recruiter/jobs/new', icon: Briefcase, color: 'text-teal-600' },
+                        { label: 'Joining Form', href: '/recruiter/joining', icon: FileCheck, color: 'text-emerald-600' },
+                        { label: 'Walk-In Queue', href: '/recruiter/walkin-queue', icon: ListChecks, color: 'text-emerald-600' },
+                        { label: 'Interview Schedule', href: '/recruiter/interviews', icon: CalendarCheck, color: 'text-violet-600' },
+                        { label: 'ATS Resume Scanner', href: '/recruiter/scan', icon: ScanLine, color: 'text-amber-600' },
+                        { label: 'Send Mail', href: '/email-center', icon: Mail, color: 'text-blue-600' },
+                        { label: 'View All Resumes', href: '/recruiter/resumes', icon: FileText, color: 'text-slate-600' },
                       ].map((action, i) => {
                         const Icon = action.icon;
                         return (
@@ -1163,10 +1515,10 @@ export function AdminDashboard() {
           {/* Team Summary Metrics */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: 'Total Calls Today',    value: totalCalls,      icon: Phone,        color: 'blue',    href: '/recruiter/resumes' },
-              { label: 'Interviews Scheduled', value: totalInterviews,  icon: Calendar,     color: 'violet',  href: '/recruiter/interviews' },
-              { label: 'Pending Follow-Ups',   value: totalFollowUps,   icon: AlertCircle,  color: 'amber',   href: '/tl/follow-ups' },
-              { label: 'Active Recruiters',    value: `${teamSummary.activeRecruiters || 0}`, icon: Users, color: 'emerald', href: '' },
+              { label: 'Total Calls Today', value: totalCalls, icon: Phone, color: 'blue', href: '/recruiter/resumes' },
+              { label: 'Interviews Scheduled', value: totalInterviews, icon: Calendar, color: 'violet', href: '/recruiter/interviews' },
+              { label: 'Pending Follow-Ups', value: totalFollowUps, icon: AlertCircle, color: 'amber', href: '/tl/follow-ups' },
+              { label: 'Active Recruiters', value: `${teamSummary.activeRecruiters || 0}`, icon: Users, color: 'emerald', href: '' },
             ].map((m, i) => {
               const Icon = m.icon;
               const colors: Record<string, string> = {
@@ -1192,7 +1544,7 @@ export function AdminDashboard() {
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-8">
               <h2 className="text-slate-800 text-sm" style={{ fontWeight: 600 }}>Team Performance — Today</h2>
-              
+
               {teams.map(tl => (
                 <div key={tl.tlId} className="space-y-4">
                   {/* TL Header Card */}
@@ -1284,8 +1636,8 @@ export function AdminDashboard() {
                 </div>
                 <div className="space-y-3">
                   {[
-                    { label: 'Avg calls/recruiter',    value: teamSummary.activeRecruiters ? Math.round(totalCalls / teamSummary.activeRecruiters) : 0 },
-                    { label: 'Total active members',   value: teamSummary.activeRecruiters || 0 },
+                    { label: 'Avg calls/recruiter', value: teamSummary.activeRecruiters ? Math.round(totalCalls / teamSummary.activeRecruiters) : 0 },
+                    { label: 'Total active members', value: teamSummary.activeRecruiters || 0 },
                     { label: 'Interviews / 100 calls', value: totalCalls > 0 ? Math.round((totalInterviews / totalCalls) * 100) : 0 },
                   ].map((s, i) => (
                     <div key={i} className="flex justify-between text-sm">
@@ -1295,6 +1647,11 @@ export function AdminDashboard() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* Team Performance Reviews Section */}
+            <div className="pt-4 border-t border-slate-100">
+              <TeamPerformanceReviews />
             </div>
           </div>
         </>
@@ -1321,9 +1678,8 @@ export function AdminDashboard() {
             <div className="flex gap-1 flex-wrap">
               {DATE_TABS.map(tab => (
                 <button key={tab} onClick={() => setAnalyticsDateRange(tab)}
-                  className={`px-4 py-1.5 rounded-lg text-xs transition-colors ${
-                    analyticsDateRange === tab ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                  className={`px-4 py-1.5 rounded-lg text-xs transition-colors ${analyticsDateRange === tab ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
                   style={{ fontWeight: analyticsDateRange === tab ? 600 : 500 }}>{tab}</button>
               ))}
             </div>
@@ -1350,10 +1706,10 @@ export function AdminDashboard() {
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: 'Total Placements', value: kpis.totalPlacements ?? '—', sub: 'This month',  trend: kpis.placementsTrend || '+0%',  up: (kpis.placementsTrend || '').startsWith('+'),  icon: Users,      color: 'blue',    href: '/manager/reports' },
-              { label: 'Interview → Hire', value: kpis.conversionRate ?? '—',  sub: 'Conversion', trend: kpis.conversionTrend || '+0%', up: (kpis.conversionTrend || '').startsWith('+'),  icon: TrendingUp, color: 'emerald', href: '/manager/reports' },
-              { label: 'Revenue Earned',   value: totalCandidateRevenue ? fmt(totalCandidateRevenue) : (kpis.revenue ? fmt(kpis.revenue) : '—'), sub: 'From Placements', trend: kpis.revenueTrend || '+0%', up: (kpis.revenueTrend || '').startsWith('+'), icon: DollarSign, color: 'violet',  href: 'tab:analytics' },
-              { label: 'Avg Time to Hire', value: kpis.avgTimeToHire ?? '—',   sub: 'From source', trend: kpis.timeToHireTrend || '0d', up: (kpis.timeToHireTrend || '').startsWith('-'),  icon: Calendar,   color: 'amber',   href: '/manager/reports' },
+              { label: 'Total Placements', value: kpis.totalPlacements ?? '—', sub: 'This month', trend: kpis.placementsTrend || '+0%', up: (kpis.placementsTrend || '').startsWith('+'), icon: Users, color: 'blue', href: '/manager/reports' },
+              { label: 'Interview → Hire', value: kpis.conversionRate ?? '—', sub: 'Conversion', trend: kpis.conversionTrend || '+0%', up: (kpis.conversionTrend || '').startsWith('+'), icon: TrendingUp, color: 'emerald', href: '/manager/reports' },
+              { label: 'Revenue Earned', value: totalCandidateRevenue ? fmt(totalCandidateRevenue) : (kpis.revenue ? fmt(kpis.revenue) : '—'), sub: 'From Placements', trend: kpis.revenueTrend || '+0%', up: (kpis.revenueTrend || '').startsWith('+'), icon: DollarSign, color: 'violet', href: 'tab:analytics' },
+              { label: 'Avg Time to Hire', value: kpis.avgTimeToHire ?? '—', sub: 'From source', trend: kpis.timeToHireTrend || '0d', up: (kpis.timeToHireTrend || '').startsWith('-'), icon: Calendar, color: 'amber', href: '/manager/reports' },
             ].map((m, i) => {
               const Icon = m.icon;
               const bg: Record<string, string> = {
@@ -1386,9 +1742,9 @@ export function AdminDashboard() {
                   <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ fontSize: 12, border: '1px solid #E2E8F0', borderRadius: 8 }} />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="resumes"    name="Resumes"    fill="#BBF7D0" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="resumes" name="Resumes" fill="#BBF7D0" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="interviews" name="Interviews" fill="#4ADE80" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="hired"      name="Hired"      fill="#16A34A" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="hired" name="Hired" fill="#16A34A" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1458,9 +1814,9 @@ export function AdminDashboard() {
                   <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ fontSize: 12, border: '1px solid #E2E8F0', borderRadius: 8 }} />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="calls"      name="Calls"      fill="#BBF7D0" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="calls" name="Calls" fill="#BBF7D0" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="interviews" name="Interviews" fill="#4ADE80" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="placed"     name="Placed"     fill="#16A34A" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="placed" name="Placed" fill="#16A34A" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1489,12 +1845,12 @@ export function AdminDashboard() {
             </div>
           </div>
 
-            {/* Link to full reports */}
-            <div className="flex justify-end mt-4">
-              <Link to="/manager/reports" className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700" style={{ fontWeight: 500 }}>
-                <BarChart2 className="w-4 h-4" /> Full Analytics Report
-              </Link>
-            </div>
+          {/* Link to full reports */}
+          <div className="flex justify-end mt-4">
+            <Link to="/manager/reports" className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700" style={{ fontWeight: 500 }}>
+              <BarChart2 className="w-4 h-4" /> Full Analytics Report
+            </Link>
+          </div>
         </div>
       )}
 
@@ -1513,9 +1869,9 @@ export function AdminDashboard() {
               { label: 'Agreements Pending', value: bizDevStats.agreementsPending ?? 0, icon: FileCheck, color: 'sky', onClick: () => setBizDevFilters({ ...bizDevFilters, kpiFilter: 'agreementsPending' }) },
               { label: 'Hot Leads', value: bizDevStats.hotLeads ?? 0, icon: Flame, color: 'red', onClick: () => setBizDevFilters({ ...bizDevFilters, kpiFilter: 'hotLeads' }) },
               { label: 'Converted Clients', value: bizDevStats.convertedClients ?? 0, icon: UserCheck, color: 'emerald', onClick: () => setBizDevFilters({ ...bizDevFilters, kpiFilter: 'convertedClients' }) },
-              { label: 'Expected Revenue', value: bizDevStats.expectedRevenue ? fmt(bizDevStats.expectedRevenue) : '₹0', icon: DollarSign, color: 'green', onClick: () => {} },
-              { label: 'Conversion %', value: `${bizDevStats.conversionPct ?? 0}%`, icon: TrendingUp, color: 'teal', onClick: () => {} },
-              { label: 'Avg Calls/Day', value: bizDevStats.avgCallsPerDay ?? 0, icon: Activity, color: 'slate', onClick: () => {} },
+              { label: 'Expected Revenue', value: bizDevStats.expectedRevenue ? fmt(bizDevStats.expectedRevenue) : '₹0', icon: DollarSign, color: 'green', onClick: () => { } },
+              { label: 'Conversion %', value: `${bizDevStats.conversionPct ?? 0}%`, icon: TrendingUp, color: 'teal', onClick: () => { } },
+              { label: 'Avg Calls/Day', value: bizDevStats.avgCallsPerDay ?? 0, icon: Activity, color: 'slate', onClick: () => { } },
             ].map((card, i) => {
               const Icon = card.icon;
               const bgColors: Record<string, string> = {
@@ -1772,12 +2128,11 @@ export function AdminDashboard() {
                             <td className="px-4 py-3">{rec.source || '—'}</td>
                             <td className="px-4 py-3">{rec.serviceOffered || '—'}</td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                rec.callStatus === 'Converted' || rec.callStatus === 'Existing Client' ? 'bg-emerald-100 text-emerald-800' :
-                                rec.callStatus === 'Not Interested' || rec.callStatus === 'Wrong Number' ? 'bg-red-100 text-red-800' :
-                                rec.callStatus === 'Meeting Fixed' || rec.callStatus === 'Proposal Sent' ? 'bg-indigo-100 text-indigo-800' :
-                                'bg-slate-100 text-slate-800'
-                              }`}>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${rec.callStatus === 'Converted' || rec.callStatus === 'Existing Client' ? 'bg-emerald-100 text-emerald-800' :
+                                  rec.callStatus === 'Not Interested' || rec.callStatus === 'Wrong Number' ? 'bg-red-100 text-red-800' :
+                                    rec.callStatus === 'Meeting Fixed' || rec.callStatus === 'Proposal Sent' ? 'bg-indigo-100 text-indigo-800' :
+                                      'bg-slate-100 text-slate-800'
+                                }`}>
                                 {rec.callStatus}
                               </span>
                             </td>
@@ -1789,16 +2144,14 @@ export function AdminDashboard() {
                             </td>
                             <td className="px-4 py-3 text-center">{rec.meetingFixed}</td>
                             <td className="px-4 py-3 text-center">
-                              <span className={`px-1.5 py-0.5 rounded font-medium text-[10px] ${
-                                rec.proposalSent === 'Yes' ? 'text-emerald-700 bg-emerald-50' :
-                                rec.proposalSent === 'Pending' ? 'text-amber-700 bg-amber-50' : 'text-slate-500'
-                              }`}>{rec.proposalSent}</span>
+                              <span className={`px-1.5 py-0.5 rounded font-medium text-[10px] ${rec.proposalSent === 'Yes' ? 'text-emerald-700 bg-emerald-50' :
+                                  rec.proposalSent === 'Pending' ? 'text-amber-700 bg-amber-50' : 'text-slate-500'
+                                }`}>{rec.proposalSent}</span>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span className={`px-1.5 py-0.5 rounded font-medium text-[10px] ${
-                                rec.agreementSent === 'Yes' ? 'text-emerald-700 bg-emerald-50' :
-                                rec.agreementSent === 'Pending' ? 'text-amber-700 bg-amber-50' : 'text-slate-500'
-                              }`}>{rec.agreementSent}</span>
+                              <span className={`px-1.5 py-0.5 rounded font-medium text-[10px] ${rec.agreementSent === 'Yes' ? 'text-emerald-700 bg-emerald-50' :
+                                  rec.agreementSent === 'Pending' ? 'text-amber-700 bg-amber-50' : 'text-slate-500'
+                                }`}>{rec.agreementSent}</span>
                             </td>
                             <td className="px-4 py-3">
                               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusColor}`}>
@@ -1881,7 +2234,7 @@ export function AdminDashboard() {
             {/* Modal Body / Form */}
             <form onSubmit={handleBizDevSubmit} className="flex-1 flex flex-col overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                
+
                 {/* Section 1: Company Profile */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-green-600 mb-3 border-b border-slate-100 pb-1.5">

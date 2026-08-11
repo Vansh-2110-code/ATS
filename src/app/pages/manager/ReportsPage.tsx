@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Download, Filter, TrendingUp, TrendingDown, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -121,10 +121,10 @@ export function ReportsPage() {
   // Filtered Active Profiles
   const filteredActiveProfiles = activeProfilesData.filter(c => {
     if (activeProfileFilter === 'All') return true;
-    if (activeProfileFilter === 'Documentation') return ['Documentation', 'Document Pending', 'Documents Pending'].includes(c.status);
-    if (activeProfileFilter === 'Pending Customer') return ['HR Shortlist', 'SPOC Shortlisted', 'Selected for Call', 'Operations Round', 'Interview Scheduled', 'Written Test'].includes(c.status);
-    if (activeProfileFilter === 'Yet To Join') return ['Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'].includes(c.status);
-    if (activeProfileFilter === 'Screening') return ['Screening', 'Contacted', 'Interested', 'Selected for Call', 'Eligible Candidates', 'Call Back'].includes(c.status);
+    if (activeProfileFilter === 'Documentation') return ['Document Initialized', 'Documentation Completed', 'Documentation Incomplete', 'Documentation', 'Document Pending', 'Documents Pending', 'Documennt Initialted'].includes(c.status);
+    if (activeProfileFilter === 'Pending Customer') return ['Submitted to Client', 'Submitted To Client', 'L1 Select', 'L2 Select', 'VNA Select', 'Test Select', 'HR Shortlist', 'SPOC Shortlisted', 'Selected for Call', 'Operations Round', 'Interview Scheduled', 'Written Test'].includes(c.status);
+    if (activeProfileFilter === 'Yet To Join') return ['Offer Accept', 'Waiting for Offer', 'Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'].includes(c.status);
+    if (activeProfileFilter === 'Screening') return ['Eligible', 'Eligible Candidates', 'Screening', 'Contacted', 'Interested', 'Selected for Call', 'Call Back', 'Hold', 'No Response'].includes(c.status);
     return true;
   });
 

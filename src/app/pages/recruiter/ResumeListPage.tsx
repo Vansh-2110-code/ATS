@@ -365,7 +365,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
       setCandidates(list.map((c: any) => ({
         id: c._id || c.id, name: c.name,
         skills: Array.isArray(c.skills) ? c.skills.join(', ') : (c.skills || ''),
-        exp: c.experience || '', source: c.source || '', status: c.status || 'New',
+        exp: c.experience || '', source: c.source || '', status: c.status || 'Eligible',
         email: c.email || '', city: c.city || '', localArea: c.localArea || '',
         resumePath: c.resumePath || '',
         recruiter: c.assignedRecruiterName || 'Unassigned',
