@@ -788,12 +788,12 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
         {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
+        <div className="hidden md:block overflow-auto max-h-[calc(100vh-280px)]">
+          <table className="w-full relative">
+            <thead className="sticky top-0 z-20 bg-slate-50 shadow-sm">
+              <tr className="border-b border-slate-100">
                 <th className="px-5 py-3 text-left w-10">
                   <input
                     type="checkbox"
@@ -833,14 +833,14 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                   <th className="px-5 py-3 text-left text-xs text-slate-500 uppercase tracking-wide" style={{ fontWeight: 600 }}>Recruiter</th>
                 )}
                 {visibleCols.action && (
-                  <th className="px-5 py-3 text-center text-xs text-slate-500 uppercase tracking-wide" style={{ fontWeight: 600 }}>Action</th>
+                  <th className="px-5 py-3 text-center text-xs text-slate-500 uppercase tracking-wide sticky right-0 bg-slate-50 z-30 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] border-l border-slate-200" style={{ fontWeight: 600 }}>Action</th>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="px-5 py-4 w-10">
+                <tr key={c.id} className="hover:bg-slate-50/60 transition-colors group">
+                  <td className="px-5 py-4 w-10 bg-inherit">
                     <input
                       type="checkbox"
                       checked={selectedIds.includes(c.id)}
@@ -855,7 +855,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                     />
                   </td>
                   {visibleCols.name && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                           <span className="text-green-700 text-xs" style={{ fontWeight: 600 }}>
@@ -873,22 +873,22 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                     </td>
                   )}
                   {visibleCols.skills && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <p className="text-slate-600 text-sm truncate max-w-[180px]">{c.skills}</p>
                     </td>
                   )}
                   {visibleCols.exp && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <span className="text-slate-600 text-sm">{c.exp}</span>
                     </td>
                   )}
                   {visibleCols.source && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <span className="text-slate-500 text-sm">{c.source}</span>
                     </td>
                   )}
                   {visibleCols.city && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <div className="flex items-center gap-1 text-slate-500 text-sm">
                         {c.city ? (
                           <>
@@ -902,25 +902,25 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
                     </td>
                   )}
                   {visibleCols.localArea && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <span className="text-slate-500 text-sm">{c.localArea || '—'}</span>
                     </td>
                   )}
                   {visibleCols.status && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <span className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLORS[c.status] ?? 'bg-slate-100 text-slate-600'}`} style={{ fontWeight: 500 }}>
                         {c.status}
                       </span>
                     </td>
                   )}
                   {visibleCols.recruiter && (
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 bg-inherit">
                       <span className="text-slate-600 text-sm">{c.recruiter || 'Unassigned'}</span>
                     </td>
                   )}
                   {visibleCols.action && (
-                    <td className="px-5 py-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                    <td className="px-5 py-4 text-center sticky right-0 bg-white group-hover:bg-slate-50/90 z-10 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] border-l border-slate-50 transition-colors">
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap w-[220px]">
                         <Link
                           to={`/recruiter/candidate/${c.id}`}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-green-50 text-green-600 text-xs rounded-lg hover:bg-green-100 transition-colors"
