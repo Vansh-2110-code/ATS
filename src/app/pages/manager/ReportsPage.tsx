@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Download, Filter, TrendingUp, TrendingDown, ChevronUp, ChevronDown, Briefcase, FileText, DollarSign, Users, Search, CheckCircle2, Clock, Building2, UserCheck, Layers } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -149,8 +149,8 @@ export function ReportsPage() {
         filteredActiveJRs.map(j => `"${j.jrNumber}","${j.customerName}","${j.jobTitle}","${j.skills.replace(/"/g, '""')}",${j.positions},${j.activeProfilesCount},"${j.createdBy}","${j.status}"`).join('\n');
     } else if (activeView === 'active-profiles') {
       filename = `active_profiles_report_${dateFrom}_${dateTo}.csv`;
-      csv = 'Candidate Name,Phone,Email,Position Applied,Customer Name,Active Status,JR Number,Recruiter,Days Pending,Last Updated\n' +
-        filteredActiveProfiles.map(c => `"${c.name}","${c.phone}","${c.email}","${c.positionApplied}","${c.clientName}","${c.status}","${c.jrNumber}","${c.recruiter}",${c.daysPending},"${c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : ''}"`).join('\n');
+      csv = 'Candidate Name,Phone,Email,Position Applied,Customer Name,Active Status,JR Number,Recruiter,Team Leader,Days Pending,Last Updated\n' +
+        filteredActiveProfiles.map(c => `"${c.name}","${c.phone}","${c.email}","${c.positionApplied}","${c.clientName}","${c.status}","${c.jrNumber}","${c.recruiter}","${c.teamLeader || c.teamLead || 'Unassigned'}",${c.daysPending},"${c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : ''}"`).join('\n');
     } else if (activeView === 'expected-revenue') {
       filename = `expected_revenue_report_${dateFrom}_${dateTo}.csv`;
       if (revenueSubView === 'customer') {
@@ -449,19 +449,20 @@ export function ReportsPage() {
                     <th className="px-4 py-3 font-semibold">Active Status</th>
                     <th className="px-4 py-3 font-semibold">JR Number</th>
                     <th className="px-4 py-3 font-semibold">Recruiter</th>
+                    <th className="px-4 py-3 font-semibold">Team Leader</th>
                     <th className="px-4 py-3 font-semibold text-center">Days Pending</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-slate-700">
                   {filteredActiveProfiles.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-12 text-slate-400">No active profiles matching the selected status filter.</td>
+                      <td colSpan={9} className="text-center py-12 text-slate-400">No active profiles matching the selected status filter.</td>
                     </tr>
                   ) : (
                     filteredActiveProfiles.map((c, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-4 py-3.5 font-bold text-slate-900">{c.name}</td>
-                        <td className="px-4 py-3.5 text-slate-500">{c.phone} {c.email ? `┬╖ ${c.email}` : ''}</td>
+                        <td className="px-4 py-3.5 text-slate-500">{c.phone} {c.email ? `· ${c.email}` : ''}</td>
                         <td className="px-4 py-3.5 font-medium">{c.positionApplied}</td>
                         <td className="px-4 py-3.5 font-semibold text-blue-600">{c.clientName}</td>
                         <td className="px-4 py-3.5">
@@ -471,6 +472,7 @@ export function ReportsPage() {
                         </td>
                         <td className="px-4 py-3.5 font-mono text-slate-600">{c.jrNumber}</td>
                         <td className="px-4 py-3.5 text-slate-600">{c.recruiter}</td>
+                        <td className="px-4 py-3.5 text-slate-600">{c.teamLeader || c.teamLead || 'Unassigned'}</td>
                         <td className="px-4 py-3.5 text-center">
                           <span className={`px-2 py-0.5 rounded font-semibold ${
                             c.daysPending > 14 ? 'bg-red-100 text-red-700' :

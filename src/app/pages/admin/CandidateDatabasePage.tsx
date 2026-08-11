@@ -56,6 +56,12 @@ export function CandidateDatabasePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const queryParams = new URLSearchParams(location.search);
+  const urlSource = queryParams.get('source') || '';
+  const urlStatus = queryParams.get('statusFilter') || queryParams.get('status') || '';
+  const urlStatusIn = queryParams.get('statusIn') || '';
+  const urlDivision = queryParams.get('division') || '';
+
   const stateFilter = (location.state as any)?.sourceFilter as string | undefined;
   const stateStatusFilter = (location.state as any)?.statusFilter as string | undefined;
 
@@ -69,8 +75,10 @@ export function CandidateDatabasePage() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState(stateFilter || '');
-  const [statusFilter, setStatusFilter] = useState(stateStatusFilter || '');
+  const [sourceFilter, setSourceFilter] = useState(stateFilter || urlSource || '');
+  const [statusFilter, setStatusFilter] = useState(stateStatusFilter || urlStatus || '');
+  const [statusInFilter, setStatusInFilter] = useState(urlStatusIn || '');
+  const [divisionFilter, setDivisionFilter] = useState(urlDivision || '');
   const [reassignFilter, setReassignFilter] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -176,6 +184,8 @@ export function CandidateDatabasePage() {
       if (search) params.search = search;
       if (sourceFilter) params.source = sourceFilter;
       if (statusFilter) params.status = statusFilter;
+      if (statusInFilter) params.statusIn = statusInFilter;
+      if (divisionFilter) params.division = divisionFilter;
       if (reassignFilter) params.reassignRequested = 'true';
       if (fromDate) params.fromDate = fromDate;
       if (toDate) params.toDate = toDate;
@@ -190,7 +200,7 @@ export function CandidateDatabasePage() {
     } finally {
       setLoading(false);
     }
-  }, [search, sourceFilter, statusFilter, reassignFilter, fromDate, toDate, page]);
+  }, [search, sourceFilter, statusFilter, statusInFilter, divisionFilter, reassignFilter, fromDate, toDate, page]);
 
   // Stats fetch (no filters)
   useEffect(() => {

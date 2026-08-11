@@ -764,7 +764,7 @@ export function AdminDashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
                 { label: 'Open Positions', value: adminMetrics.openPositionsCount ?? adminMetrics.openJobsCount ?? '0', sub: 'Active Vacancies', icon: Briefcase, color: 'blue', href: '/admin/jobs?status=Open' },
-                { label: 'Selected', value: adminMetrics.selectedCount ?? '0', sub: 'Offered Candidates', icon: BadgeCheck, color: 'emerald', href: '/admin/candidates?statusFilter=Selected' },
+                { label: 'Offer Selected', value: adminMetrics.offerSelectedCount ?? adminMetrics.selectedCount ?? '0', sub: 'Offered / Selected', icon: BadgeCheck, color: 'emerald', href: `/admin/candidates?statusIn=${encodeURIComponent('Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,Client Select,Final Select,Test Select,Yet To Join')}` },
                 { label: 'Operations Round', value: adminMetrics.opsRoundCount ?? adminMetrics.operationsRoundCount ?? '0', sub: 'In Ops Round', icon: Building2, color: 'violet', href: '/admin/candidates?statusFilter=Operations%20Round' },
                 { label: 'HR Round', value: adminMetrics.hrRoundCount ?? '0', sub: 'In HR Round', icon: ClipboardList, color: 'amber', href: '/admin/candidates?statusFilter=HR%20Shortlist' },
                 { label: 'Yet to Join', value: adminMetrics.yetToJoinCount ?? adminMetrics.followToJoinCount ?? '0', sub: 'Offer Accepted', icon: UserCheck, color: 'purple', href: '/admin/candidates?statusFilter=Yet%20To%20Join' },
@@ -783,6 +783,8 @@ export function AdminDashboard() {
                   if (m.href.includes('statusFilter=')) {
                     const status = decodeURIComponent(m.href.split('statusFilter=')[1]);
                     navigate('/admin/candidates', { state: { statusFilter: status } });
+                  } else if (m.href.includes('statusIn=')) {
+                    navigate(m.href);
                   } else if (m.href.includes('status=')) {
                     navigate('/admin/jobs');
                   } else {
@@ -1777,9 +1779,10 @@ export function AdminDashboard() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {[
-              { label: 'Total Placements', value: kpis.totalPlacements ?? '—', sub: 'This month', trend: kpis.placementsTrend || '+0%', up: (kpis.placementsTrend || '').startsWith('+'), icon: Users, color: 'blue', href: '/manager/reports' },
+              { label: 'Offer Selected', value: adminMetrics.offerSelectedCount ?? kpis.offerSelected ?? '—', sub: 'Offered / Selected', trend: kpis.offerSelectedTrend || '+0%', up: (kpis.offerSelectedTrend || '').startsWith('+'), icon: BadgeCheck, color: 'emerald', href: `/admin/candidates?statusIn=${encodeURIComponent('Document Initialized,Documennt Initialted,Documentation Completed,Documentation Incomplete,Waiting for Offer,Offer Accept,Offered,Offer Released,Offer Accepted,Document Pending,Documentation,Selected,L1 Select,Client Select,Final Select,Test Select,Yet To Join')}` },
+              { label: 'Total Placements', value: kpis.totalPlacements ?? adminMetrics.joinedCount ?? '—', sub: 'This month', trend: kpis.placementsTrend || '+0%', up: (kpis.placementsTrend || '').startsWith('+'), icon: Users, color: 'blue', href: '/manager/reports' },
               { label: 'Interview → Hire', value: kpis.conversionRate ?? '—', sub: 'Conversion', trend: kpis.conversionTrend || '+0%', up: (kpis.conversionTrend || '').startsWith('+'), icon: TrendingUp, color: 'emerald', href: '/manager/reports' },
               { label: 'Revenue Earned', value: totalCandidateRevenue ? fmt(totalCandidateRevenue) : (kpis.revenue ? fmt(kpis.revenue) : '—'), sub: 'From Placements', trend: kpis.revenueTrend || '+0%', up: (kpis.revenueTrend || '').startsWith('+'), icon: DollarSign, color: 'violet', href: 'tab:analytics' },
               { label: 'Avg Time to Hire', value: kpis.avgTimeToHire ?? '—', sub: 'From source', trend: kpis.timeToHireTrend || '0d', up: (kpis.timeToHireTrend || '').startsWith('-'), icon: Calendar, color: 'amber', href: '/manager/reports' },

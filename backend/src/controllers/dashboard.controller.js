@@ -374,7 +374,23 @@ exports.managerDashboard = async (req, res, next) => {
     const prevDateFilter = { $gte: prevStart, $lt: start };
 
     // KPIs
+    const offerStatusesList = [
+      'Selected', 'L1 Select', 'L2 Select', 'Final Select', 'VNA Select', 'Test Select', 'Client Select',
+      'Waiting for Offer', 'Offer Accept', 'Offered', 'Offer Released', 'Offer Accepted',
+      'Document Initialized', 'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete', 'Documentation', 'Document Pending',
+      'Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'
+    ];
     const totalPlacements = await Candidate.countDocuments({ status: 'Joined', updatedAt: dateFilter });
+    const offerSelected = await Candidate.countDocuments({ status: { $in: offerStatusesList }, updatedAt: dateFilter });
+    const offerSelectedPrev = await Candidate.countDocuments({ status: { $in: offerStatusesList }, updatedAt: prevDateFilter });
+    let offerSelectedTrend = '+0%';
+    if (offerSelectedPrev > 0) {
+      const pct = Math.round(((offerSelected - offerSelectedPrev) / offerSelectedPrev) * 100);
+      offerSelectedTrend = `${pct >= 0 ? '+' : ''}${pct}%`;
+    } else if (offerSelected > 0) {
+      offerSelectedTrend = '+100%';
+    }
+
     const totalInterviews = await Interview.countDocuments({ createdAt: dateFilter });
     const completedInterviews = await Interview.countDocuments({ status: 'Completed', updatedAt: dateFilter });
     const interviewToHire = totalInterviews > 0 ? Math.round((totalPlacements / totalInterviews) * 100) : 0;
@@ -446,6 +462,9 @@ exports.managerDashboard = async (req, res, next) => {
     res.json({
       kpis: {
         totalPlacements,
+        offerSelected,
+        offerSelectedCount: offerSelected,
+        offerSelectedTrend,
         totalInterviews,
         completedInterviews,
         interviewToHireRate: interviewToHire,
@@ -502,6 +521,24 @@ exports.adminDashboard = async (req, res, next) => {
       ...followUpFilter,
     });
 
+    // Offer Selected: candidates in offered or selected stages
+    const offerSelectedStatuses = [
+      'Selected', 'L1 Select', 'L2 Select', 'Final Select', 'VNA Select', 'Test Select', 'Client Select',
+      'Waiting for Offer', 'Offer Accept', 'Offered', 'Offer Released', 'Offer Accepted',
+      'Document Initialized', 'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete', 'Documentation', 'Document Pending',
+      'Yet To Join', 'Joining Date Confirmed', 'Joining Postponed'
+    ];
+    const offerSelectedCount = await Candidate.countDocuments({
+      ...dateMatch,
+      status: { $in: offerSelectedStatuses }
+    });
+
+    // Operations Round: candidates in operations or interview rounds
+    const opsRoundCount = await Candidate.countDocuments({
+      ...dateMatch,
+      status: { $in: ['Operations Round', 'Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Interview', 'Selected for Interview', 'Written Test'] }
+    });
+
     // HR Round: candidates in HR Shortlist status
     const hrRoundCount = await Candidate.countDocuments({ ...dateMatch, status: 'HR Shortlist' });
 
@@ -526,9 +563,11 @@ exports.adminDashboard = async (req, res, next) => {
     // Rejected count
     const rejectedCount = await Candidate.countDocuments({ ...dateMatch, status: 'Rejected' });
 
-    // Open Jobs count
+    // Open Jobs & Open Positions count
     const jobMatch = selectedRange === 'all' ? { status: 'Open' } : { status: 'Open', createdAt: { $gte: start, $lt: end } };
-    const openJobsCount = await Job.countDocuments(jobMatch);
+    const openJobs = await Job.find(jobMatch).select('positions').lean();
+    const openJobsCount = openJobs.length;
+    const openPositionsCount = openJobs.reduce((sum, j) => sum + (j.positions || 1), 0);
 
     // Revenue this month (from Revenue model if it exists)
     let currentMonthRevenue = 0;
@@ -579,14 +618,18 @@ exports.adminDashboard = async (req, res, next) => {
         totalCandidates: totalResumes,
         pendingFollowUps,
         hrRoundCount,
-        selectedCount,
-        selected: selectedCount,
+        opsRoundCount,
+        operationsRoundCount: opsRoundCount,
         followToJoinCount,
         yetToJoinCount: followToJoinCount,
         joinedCount,
         joined: joinedCount,
         rejectedCount,
         openJobsCount,
+        openPositionsCount,
+        selectedCount: offerSelectedCount,
+        offerSelectedCount,
+        offerSelected: offerSelectedCount,
         currentMonthRevenue,
       },
       sourceChart: sourceChart.map(s => ({ source: s._id || 'Unknown', count: s.count })),
