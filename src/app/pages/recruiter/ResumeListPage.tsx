@@ -759,7 +759,7 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
         )}
       </div>
 
-      {/* Status Quick Filters (Official 32 Candidate Statuses) */}
+      {/* Status Quick Filters */}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setStatusFilter('All Status')}
@@ -771,9 +771,10 @@ export function ResumeListPage({ lockedStatus }: { lockedStatus?: string }) {
         {CANDIDATE_STATUS_OPTIONS.map((status) => {
           const color = CANDIDATE_STATUS_COLORS[status] || 'bg-slate-100 text-slate-600 border-slate-200';
           const count = candidates.filter(c => {
-            if (status === 'Eligible') return c.status === 'Eligible' || c.status === 'Eligible Candidates';
+            if (status === 'Eligible Candidates' || status === 'Eligible') return c.status === 'Eligible' || c.status === 'Eligible Candidates';
             return c.status === status;
           }).length;
+          if (count === 0 && statusFilter !== status) return null;
           return (
             <button
               key={status}

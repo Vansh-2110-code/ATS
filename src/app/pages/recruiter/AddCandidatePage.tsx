@@ -725,13 +725,13 @@ export function AddCandidatePage() {
         if (form.recruiterStatus) {
           fd.append('status', form.recruiterStatus);
         } else {
-          fd.append('status', 'Eligible');
+          fd.append('status', 'New');
         }
       } else {
         if (form.recruiterStatus) {
           fd.append('status', form.recruiterStatus);
         } else {
-          fd.append('status', 'Eligible');
+          fd.append('status', 'New');
         }
       }
 
