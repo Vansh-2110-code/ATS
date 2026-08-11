@@ -1226,7 +1226,8 @@ exports.advancedReports = async (req, res, next) => {
 
     // 8. Revenue Report (ONLY Joined Candidates with CTC, Date of Joining & Customer/Division Breakdown)
     const joinedCandidatesRaw = await Candidate.find({
-      status: 'Joined'
+      status: 'Joined',
+      ...(selectedRange !== 'all' ? { createdAt: { $gte: start, $lt: end } } : {})
     }).select('name phone email positionApplied clientName companyName division joiningSalary placementPercentage revenueGenerated offerDetails dateOfJoining expectedDateOfJoining assignedRecruiterName updatedAt createdAt').lean();
 
     const joinedCandidatesList = joinedCandidatesRaw.map(c => {
@@ -1260,28 +1261,63 @@ exports.advancedReports = async (req, res, next) => {
 
     const totalJoinedRevenue = joinedCandidatesList.reduce((sum, c) => sum + c.revenue, 0);
 
+    // Yet To Join candidates for projected revenue
+    const yetToJoinRaw = await Candidate.find({
+      status: { $in: ['Yet To Join', 'Offer Accept', 'Offer Accepted', 'Waiting for Offer', 'Joining Date Confirmed', 'Joining Postponed'] },
+      ...(selectedRange !== 'all' ? { createdAt: { $gte: start, $lt: end } } : {})
+    }).select('clientName companyName division joiningSalary placementPercentage revenueGenerated offerDetails').lean();
+
     const customerRevMap = {};
     const divisionRevMap = {};
 
+    // Process joined candidates into maps
     joinedCandidatesList.forEach(c => {
       const cust = c.customerName;
       const div = c.division;
 
       if (!customerRevMap[cust]) {
-        customerRevMap[cust] = { customerName: cust, joinedCount: 0, actualJoinedRevenue: 0 };
+        customerRevMap[cust] = { customerName: cust, yetToJoinCount: 0, joinedCount: 0, expectedRevenue: 0, actualJoinedRevenue: 0 };
       }
       customerRevMap[cust].joinedCount += 1;
       customerRevMap[cust].actualJoinedRevenue += c.revenue;
 
       if (!divisionRevMap[div]) {
-        divisionRevMap[div] = { division: div, joinedCount: 0, actualJoinedRevenue: 0 };
+        divisionRevMap[div] = { division: div, yetToJoinCount: 0, joinedCount: 0, expectedRevenue: 0, actualJoinedRevenue: 0 };
       }
       divisionRevMap[div].joinedCount += 1;
       divisionRevMap[div].actualJoinedRevenue += c.revenue;
     });
 
-    const customerJoinedRevenue = Object.values(customerRevMap).sort((a, b) => b.actualJoinedRevenue - a.actualJoinedRevenue);
-    const divisionJoinedRevenue = Object.values(divisionRevMap).sort((a, b) => b.actualJoinedRevenue - a.actualJoinedRevenue);
+    // Process Yet To Join candidates for projected revenue
+    let totalExpectedFromYTJ = 0;
+    yetToJoinRaw.forEach(c => {
+      const cust = c.clientName || c.companyName || 'General / Unspecified';
+      const div = c.division || 'BPO';
+
+      let ctc = parseFloat(c.joiningSalary) || parseFloat(c.offerDetails?.joiningSalary) || parseFloat(c.offerDetails?.offeredCTC) || 0;
+      let projRev = parseFloat(c.revenueGenerated) || 0;
+      if (!projRev && ctc) {
+        const pct = parseFloat(c.placementPercentage) || parseFloat(c.offerDetails?.placementPercentage) || 8.33;
+        projRev = (ctc * pct) / 100;
+      }
+      if (!projRev) projRev = 25000;
+      totalExpectedFromYTJ += projRev;
+
+      if (!customerRevMap[cust]) {
+        customerRevMap[cust] = { customerName: cust, yetToJoinCount: 0, joinedCount: 0, expectedRevenue: 0, actualJoinedRevenue: 0 };
+      }
+      customerRevMap[cust].yetToJoinCount += 1;
+      customerRevMap[cust].expectedRevenue += projRev;
+
+      if (!divisionRevMap[div]) {
+        divisionRevMap[div] = { division: div, yetToJoinCount: 0, joinedCount: 0, expectedRevenue: 0, actualJoinedRevenue: 0 };
+      }
+      divisionRevMap[div].yetToJoinCount += 1;
+      divisionRevMap[div].expectedRevenue += projRev;
+    });
+
+    const customerJoinedRevenue = Object.values(customerRevMap).sort((a, b) => (b.actualJoinedRevenue + b.expectedRevenue) - (a.actualJoinedRevenue + a.expectedRevenue));
+    const divisionJoinedRevenue = Object.values(divisionRevMap).sort((a, b) => (b.actualJoinedRevenue + b.expectedRevenue) - (a.actualJoinedRevenue + a.expectedRevenue));
 
     const expectedRevenueReport = {
       joinedCandidates: joinedCandidatesList,
@@ -1289,8 +1325,7 @@ exports.advancedReports = async (req, res, next) => {
       divisionRevenue: divisionJoinedRevenue,
       totalJoinedRevenue,
       totalJoinedCount: joinedCandidatesList.length,
-      // Backward compatibility keys
-      totalExpectedRevenue: totalJoinedRevenue,
+      totalExpectedRevenue: totalJoinedRevenue + totalExpectedFromYTJ,
     };
 
     // 9. Lead and Recruiter Performance Report (Flat List & Team-Wise Hierarchy)
