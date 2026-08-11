@@ -505,6 +505,18 @@ exports.adminDashboard = async (req, res, next) => {
     // HR Round: candidates in HR Shortlist status
     const hrRoundCount = await Candidate.countDocuments({ ...dateMatch, status: 'HR Shortlist' });
 
+    // Selected / Offered: candidates with status in final selection, offer or documentation
+    const selectedCount = await Candidate.countDocuments({
+      ...dateMatch,
+      status: {
+        $in: [
+          'Selected', 'Final Select', 'Client Select', 'Waiting for Offer', 'Offered', 'Offer Released',
+          'Offer Accept', 'Offer Accepted', 'Document Initialized', 'Documennt Initialted',
+          'Documentation Completed', 'Documentation Incomplete', 'Document Pending', 'Documentation'
+        ]
+      }
+    });
+
     // Follow to Join: candidates with status 'Yet To Join'
     const followToJoinCount = await Candidate.countDocuments({ ...dateMatch, status: 'Yet To Join' });
 
@@ -567,7 +579,10 @@ exports.adminDashboard = async (req, res, next) => {
         totalCandidates: totalResumes,
         pendingFollowUps,
         hrRoundCount,
+        selectedCount,
+        selected: selectedCount,
         followToJoinCount,
+        yetToJoinCount: followToJoinCount,
         joinedCount,
         joined: joinedCount,
         rejectedCount,
@@ -852,14 +867,17 @@ exports.divisionDashboard = async (req, res, next) => {
 
     const interviewStatuses = [
       'Interview Scheduled', 'Interview Rescheduled', 'Interview Completed', 'Interview',
-      'Selected for Interview', 'Written Test', 'Operations Round', 'Interview Feedback Pending'
+      'Selected for Interview', 'Written Test', 'Operations Round', 'Interview Feedback Pending',
+      'Test Select', 'Test Reject', 'L1 Select', 'L1 Reject', 'L2 Select', 'L2 Reject', 'VNA Select', 'VNA Reject',
+      'Candidate Drop Post L1 Select', 'Candidate Drop Post L2 Select', 'Candidate Drop During Final Stage',
+      'Final Reject', 'No Show'
     ];
 
     const offerStatuses = [
-      'Document Initialized', 'Documennt Initialted', 'Documentation Completed',
-      'Documentation Incomplete', 'Waiting for Offer', 'Offer Accept', 'Offered',
-      'Offer Released', 'Offer Accepted', 'Document Pending', 'Documentation',
-      'Selected', 'L1 Select', 'L2 Select', 'Final Select', 'VNA Select', 'Test Select', 'Client Select'
+      'Selected', 'Final Select', 'Client Select', 'Waiting for Offer', 'Offered',
+      'Offer Released', 'Offer Accept', 'Offer Accepted', 'Document Initialized',
+      'Documennt Initialted', 'Documentation Completed', 'Documentation Incomplete',
+      'Document Pending', 'Documentation'
     ];
 
     const baseYetToJoinOr = [
