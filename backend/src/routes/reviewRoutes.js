@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const reviewController = require('../controllers/review.controller');
-const { protect, restrictTo } = require('../middleware/auth');
+const { protect, restrictTo } = require('../middleware/auth.middleware');
 
 router.use(protect);
 router.use(restrictTo('admin', 'tl', 'manager'));
